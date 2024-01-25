@@ -41,6 +41,10 @@ impl TextEditor {
         }
         let text_length = file_handle.lines().count();
         let size = termion::terminal_size().unwrap();
+        let mut upper_line = size.1 as usize - 1;
+        if text_length < upper_line {
+            upper_line = text_length;
+        }
         let mut out = MouseTerminal::from(AlternateScreen::from(BufWriter::with_capacity(
                 1 << 14,
                 stdout(),
@@ -55,13 +59,14 @@ impl TextEditor {
             cur_pos: Coordinates{x:1,y:1},
             cur_line: 1,
             lower_line: 0,
-            upper_line: text_length.min(size.1.into()) - 1,
+            upper_line,
             terminal_size: Size(size.0, size.1),
             file_name: file_name.into(),
             out,
         }
     }
 
+    #[cfg(test)]
     pub fn new_from_vec(lines: &Vec<String>) -> Self {
         let mut text = Text::new();
         for line in lines {
@@ -69,6 +74,10 @@ impl TextEditor {
         }
         let text_length = lines.len();
         let size = termion::terminal_size().unwrap();
+        let mut upper_line = size.1 as usize - 1;
+        if text_length < upper_line {
+            upper_line = text_length;
+        }
         let mut out = MouseTerminal::from(AlternateScreen::from(BufWriter::with_capacity(
                 1 << 14,
                 stdout(),
@@ -83,7 +92,7 @@ impl TextEditor {
             cur_pos: Coordinates{x:1,y:1},
             cur_line: 1,
             lower_line: 0,
-            upper_line: text_length.min(size.1.into()) - 1,
+            upper_line,
             terminal_size: Size(size.0, size.1),
             file_name: "test_file".into(),
             out,
@@ -117,11 +126,13 @@ impl TextEditor {
 
     fn show_bar(&mut self) {
         write!(self.out, "{}",termion::cursor::Goto(0, (self.terminal_size.1) as u16)).unwrap();
-        write!(self.out, "{}{} line-count={} filename: {} {}-{} {}:{}{}",
+        write!(self.out, "{}{} line-count={} filename: {}, size: ({}, {}) line[{}-{}] pos[{}:{}]{}",
                     color::Fg(color::Blue),
                     style::Bold,
                     self.text_length,
                     self.file_name,
+                    self.terminal_size.0,
+                    self.terminal_size.1,
                     self.lower_line,
                     self.upper_line,
                     self.cur_pos.x,
@@ -205,38 +216,55 @@ impl TextEditor {
     fn forward_to_end_of_cur_word(&mut self) {
         assert!(Self::is_alphabet(self.cur_char()));
         while Self::is_alphabet(self.cur_char()) {
-            self.forward_to_next_char();
+            let old_line = self.cur_line;
+            if !self.forward_to_next_char() {
+                return;
+            }
+            if self.cur_line != old_line {
+                break;
+            }
         }
         self.backward_to_next_char();
     }
     fn forward_to_start_of_cur_word(&mut self) {
         assert!(Self::is_alphabet(self.cur_char()));
         while Self::is_alphabet(self.cur_char()) {
-            self.backward_to_next_char();
+            let old_line = self.cur_line;
+            if !self.backward_to_next_char() {
+                return;
+            }
+            if  self.cur_line != old_line {
+                break;
+            }
         }
         self.forward_to_next_char();
     }
     fn backward_to_start_of_next_word(&mut self) {
-        while Self::is_alphabet(self.cur_char()) {
-            self.backward_to_next_char();
-        }
-        // we are currently in blank char, need to find the next word
-        while !Self::is_alphabet(self.cur_char()) {
-            self.backward_to_next_char();
+        self.backward_to_next_char();
+        if Self::is_alphabet(self.cur_char()) {
+            self.forward_to_start_of_cur_word();
+        } else {
+            // we are currently in blank char, need to find the next word
+            while !Self::is_alphabet(self.cur_char()) {
+                self.backward_to_next_char();
+            }
         }
         self.forward_to_start_of_cur_word();
         self.flush()
     }
     fn forward_to_end_of_next_word(&mut self) {
-        while Self::is_alphabet(self.cur_char()) {
-            self.forward_to_next_char();
-        }
-        // we are currently at non-alphabetic char, need to
-        //      find the next alphabetic char
-        while !Self::is_alphabet(self.cur_char()) {
-            self.forward_to_next_char();
+        self.forward_to_next_char();
+        if Self::is_alphabet(self.cur_char()) {
+            self.forward_to_end_of_cur_word();
+        } else {
+            // we are currently at non-alphabetic char, need to
+            //      find the next alphabetic char
+            while !Self::is_alphabet(self.cur_char()) {
+                self.forward_to_next_char();
+            }
         }
         self.forward_to_end_of_cur_word();
+
         self.flush()
     }
     fn forward_to_start_of_next_word(&mut self) {
@@ -250,7 +278,7 @@ impl TextEditor {
         self.flush()
     }
     // please note, this function DO NOT flush
-    fn backward_to_next_char(&mut self) {
+    fn backward_to_next_char(&mut self) -> bool {
         if self.cur_pos.x == 1 {
             if self.cur_line > 1 {
                 // move to the start of next line
@@ -264,16 +292,18 @@ impl TextEditor {
                 }
                 self.cur_line -= 1;
                 self.cur_pos.x = self.len_of_cur_line();
+                return true;
             } else {
                 // we hit the beginning of the file, just do nothing
-                return
+                return false;
             }
         } else {
             self.cur_pos.x -= 1;
+            return true;
         }
     }
     // please note, this function DO NOT flush
-    fn forward_to_next_char(&mut self) {
+    fn forward_to_next_char(&mut self) -> bool {
         if self.cur_pos.x == self.len_of_cur_line(){
             if self.cur_line < self.text_length  {
                 // move to the start of next line
@@ -287,12 +317,14 @@ impl TextEditor {
                 }
                 self.cur_line += 1;
                 self.cur_pos.x = 1;
+                return true;
             } else {
                 // we hit the end of the file, just do nothing
-                return
+                return false;
             }
         } else {
             self.cur_pos.x += 1;
+            return true;
         }
     }
     fn cur_char(&mut self) -> char {

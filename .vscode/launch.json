@@ -9,7 +9,7 @@
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceRoot}/target/debug/vim_rs",
-            "args": ["${workspaceRoot}/Cargo.lock"],
+            "args": ["${workspaceRoot}/test"],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
             "preLaunchTask": "build",

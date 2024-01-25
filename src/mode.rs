@@ -159,5 +159,18 @@ mod tests {
         assert_eq!(editor.text.line_at(0), "ahello");
     }
 
-    // TODO: how do we test stdout?
+    #[test]
+    fn move_between_word() {
+        let mut editor = init(vec!["hello".to_string(), "world".to_string()]);
+
+        assert_eq!(editor.cur_char(), 'h');
+        handle_keys(&mut editor, vec![Key::Char('e')]);
+        assert_eq!(editor.cur_char(), 'o');
+        handle_keys(&mut editor, vec![Key::Char('e')]);
+        assert_eq!(editor.cur_char(), 'd');
+        handle_keys(&mut editor, vec![Key::Char('b')]);
+        assert_eq!(editor.cur_char(), 'w');
+        handle_keys(&mut editor, vec![Key::Char('b')]);
+        assert_eq!(editor.cur_char(), 'h');
+    }
 }
