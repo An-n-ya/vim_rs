@@ -145,8 +145,21 @@ impl TextEditor {
         write!(self.out, "{}", termion::cursor::Goto(self.cur_pos.x as u16, self.cur_pos.y as u16)).unwrap();
     }
 
+    fn len_of_cur_line(&self) -> usize {
+        assert!(self.cur_line != 0);
+        self.text.len_of_line_at(self.cur_line - 1)
+    }
+
+    fn move_to_end_of_line(&mut self) {
+        self.cur_pos.x = self.len_of_cur_line();
+        self.flush();
+    }
+    fn move_to_start_of_line(&mut self) {
+        self.cur_pos.x = 0;
+        self.flush();
+    }
     fn inc_x(&mut self) {
-        if self.cur_pos.x < self.terminal_size.0.into() {
+        if self.cur_pos.x < self.len_of_cur_line() {
             self.cur_pos.x += 1;
         }
         self.flush();

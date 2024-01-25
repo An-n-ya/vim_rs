@@ -16,6 +16,10 @@ impl Text {
         self.lines[x].insert(y, c)
     }
 
+    pub fn len_of_line_at(&self, line: usize) -> usize {
+        let line = line.min(self.lines.len() - 1);
+        self.lines[line].len()
+    }
     pub fn line_at(&self, line: usize) -> String {
         let line = line.min(self.lines.len() - 1);
         self.lines[line].clone()

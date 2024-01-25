@@ -43,9 +43,22 @@ impl Mode {
                     editor.inc_x();
                     Mode::Normal
                 },
+                Key::Char('$') => {
+                    editor.move_to_end_of_line();
+                    Mode::Normal
+                },
+                Key::Char('0') => {
+                    editor.move_to_start_of_line();
+                    Mode::Normal
+                },
                 Key::Char('u') => {
                     todo!();
                     Mode::Normal
+                },
+                Key::Char('a') => {
+                    editor.inc_x();
+                    editor.set_cursor_style(crate::CursorStyle::Bar);
+                    Mode::Insert
                 },
                 Key::Char('i') => {
                     editor.set_cursor_style(crate::CursorStyle::Bar);
@@ -62,8 +75,11 @@ impl Mode {
     }
 
     fn handle_visual(editor: &mut TextEditor, key: Key) -> Self {
-
         match key {
+            Key::Esc => {
+                editor.set_cursor_style(crate::CursorStyle::Block);
+                Mode::Normal
+            },
             _ => Mode::Visual
         }
     }
@@ -73,8 +89,8 @@ impl Mode {
             Key::Char(c) => {
                 let x = editor.cur_line - 1;
                 let y = editor.cur_pos.x - 1;
-                editor.inc_x();
                 editor.text.insert_at(x, y, c);
+                editor.inc_x();
                 Mode::Insert
             },
             Key::Esc => {
@@ -87,6 +103,10 @@ impl Mode {
     fn handle_command(editor: &mut TextEditor, key: Key) -> Self {
 
         match key {
+            Key::Esc => {
+                editor.set_cursor_style(crate::CursorStyle::Block);
+                Mode::Normal
+            },
             _ => Mode::Command
         }
     }
@@ -125,7 +145,7 @@ mod tests {
         handle_keys(&mut editor, keys);
 
         assert_eq!(editor.text.line_at(0), "ahello");
-
-
     }
+
+    // TODO: how do we test stdout?
 }
