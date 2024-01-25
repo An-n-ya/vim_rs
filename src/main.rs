@@ -93,11 +93,14 @@ impl TextEditor {
 
     fn flush(&mut self) {
         let pos = &self.cur_pos;
-        let (old_x, old_y) = (pos.x, pos.y);
+        let (mut old_x, old_y) = (pos.x, pos.y);
 
         self.print_text();
         self.show_bar();
 
+        // FIXME: when '$' status is on, we should also move to the end of the line
+        //          no matter what old_x is.
+        old_x = old_x.min(self.len_of_cur_line());
         self.set_pos(old_x, old_y);
     }
 
