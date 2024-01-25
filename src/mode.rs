@@ -51,6 +51,18 @@ impl Mode {
                     editor.move_to_start_of_line();
                     Mode::Normal
                 },
+                Key::Char('e') => {
+                    editor.forward_to_end_of_next_word();
+                    Mode::Normal
+                },
+                Key::Char('w') => {
+                    editor.forward_to_start_of_next_word();
+                    Mode::Normal
+                },
+                Key::Char('b') => {
+                    editor.backward_to_start_of_next_word();
+                    Mode::Normal
+                },
                 Key::Char('u') => {
                     todo!();
                     Mode::Normal

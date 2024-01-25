@@ -8,6 +8,14 @@ impl Text {
             lines: vec![]
         }
     }
+    pub fn char_at(&mut self, x: usize, y: usize) -> char {
+        let x = x.min(self.lines.len() - 1);
+        if self.lines[x].len() == 0 {
+            return 0 as char
+        }
+        let y = y.min(self.lines[x].len() - 1);
+        self.lines[x].chars().nth(y).unwrap()
+    }
     pub fn insert_at(&mut self, x: usize, y: usize, c: char) {
         let x = x.min(self.lines.len() - 1);
         let y = y.min(self.lines[x].len());

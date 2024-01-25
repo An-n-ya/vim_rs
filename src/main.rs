@@ -150,7 +150,7 @@ impl TextEditor {
 
     fn len_of_cur_line(&self) -> usize {
         assert!(self.cur_line != 0);
-        self.text.len_of_line_at(self.cur_line - 1)
+        1.max(self.text.len_of_line_at(self.cur_line - 1))
     }
 
     fn move_to_end_of_line(&mut self) {
@@ -158,7 +158,7 @@ impl TextEditor {
         self.flush();
     }
     fn move_to_start_of_line(&mut self) {
-        self.cur_pos.x = 0;
+        self.cur_pos.x = 1;
         self.flush();
     }
     fn inc_x(&mut self) {
@@ -201,6 +201,108 @@ impl TextEditor {
             self.cur_line -= 1;
         }
         self.flush();
+    }
+    fn forward_to_end_of_cur_word(&mut self) {
+        assert!(Self::is_alphabet(self.cur_char()));
+        while Self::is_alphabet(self.cur_char()) {
+            self.forward_to_next_char();
+        }
+        self.backward_to_next_char();
+    }
+    fn forward_to_start_of_cur_word(&mut self) {
+        assert!(Self::is_alphabet(self.cur_char()));
+        while Self::is_alphabet(self.cur_char()) {
+            self.backward_to_next_char();
+        }
+        self.forward_to_next_char();
+    }
+    fn backward_to_start_of_next_word(&mut self) {
+        while Self::is_alphabet(self.cur_char()) {
+            self.backward_to_next_char();
+        }
+        // we are currently in blank char, need to find the next word
+        while !Self::is_alphabet(self.cur_char()) {
+            self.backward_to_next_char();
+        }
+        self.forward_to_start_of_cur_word();
+        self.flush()
+    }
+    fn forward_to_end_of_next_word(&mut self) {
+        while Self::is_alphabet(self.cur_char()) {
+            self.forward_to_next_char();
+        }
+        // we are currently at non-alphabetic char, need to
+        //      find the next alphabetic char
+        while !Self::is_alphabet(self.cur_char()) {
+            self.forward_to_next_char();
+        }
+        self.forward_to_end_of_cur_word();
+        self.flush()
+    }
+    fn forward_to_start_of_next_word(&mut self) {
+        while Self::is_alphabet(self.cur_char()) {
+            self.forward_to_next_char();
+        }
+        // we are currently in blank char, need to find the next word
+        while !Self::is_alphabet(self.cur_char()) {
+            self.forward_to_next_char();
+        }
+        self.flush()
+    }
+    // please note, this function DO NOT flush
+    fn backward_to_next_char(&mut self) {
+        if self.cur_pos.x == 1 {
+            if self.cur_line > 1 {
+                // move to the start of next line
+                if self.cur_pos.y > 1 {
+                    self.cur_pos.y -= 1;
+                } else {
+                    if self.upper_line > 0 {
+                        self.lower_line -= 1;
+                        self.upper_line -= 1;
+                    }
+                }
+                self.cur_line -= 1;
+                self.cur_pos.x = self.len_of_cur_line();
+            } else {
+                // we hit the beginning of the file, just do nothing
+                return
+            }
+        } else {
+            self.cur_pos.x -= 1;
+        }
+    }
+    // please note, this function DO NOT flush
+    fn forward_to_next_char(&mut self) {
+        if self.cur_pos.x == self.len_of_cur_line(){
+            if self.cur_line < self.text_length  {
+                // move to the start of next line
+                if self.cur_pos.y < self.max_y().into() {
+                    self.cur_pos.y += 1;
+                } else {
+                    if self.upper_line < self.text_length {
+                        self.lower_line += 1;
+                        self.upper_line += 1;
+                    }
+                }
+                self.cur_line += 1;
+                self.cur_pos.x = 1;
+            } else {
+                // we hit the end of the file, just do nothing
+                return
+            }
+        } else {
+            self.cur_pos.x += 1;
+        }
+    }
+    fn cur_char(&mut self) -> char {
+        self.text.char_at(self.cur_line - 1, self.cur_pos.x - 1)
+    }
+    fn is_alphabet(c: char) -> bool {
+        c.is_alphanumeric()
+    }
+    fn is_blank(c: char) -> bool {
+        c == ' ' || c == '\n' || c == '\t'
     }
     fn run(&mut self) {
         self.flush();
