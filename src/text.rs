@@ -24,6 +24,23 @@ impl Text {
         self.lines[x].insert(y, c)
     }
 
+    pub fn len(&self) -> usize {
+        self.lines.len()
+    }
+
+    pub fn delete_line_at(&mut self, x: usize) {
+        let x = x.min(self.lines.len() - 1);
+        self.lines.remove(x);
+    }
+    pub fn delete_at(&mut self, x: usize, y: usize) {
+        let x = x.min(self.lines.len() - 1);
+        let y = y.min(self.lines[x].len());
+        let y = 0.max(y - 1);
+        if self.lines[x].len() > 0 {
+            self.lines[x].remove(y);
+        }
+    }
+
     pub fn len_of_line_at(&self, line: usize) -> usize {
         let line = line.min(self.lines.len() - 1);
         self.lines[line].len()
@@ -62,5 +79,9 @@ mod tests {
         }
         assert_eq!(text.line_at(0), "Annya hello".to_string());
         assert_eq!(text.line_at(1), "world and happy every day!".to_string());
+        for i in 0..21 {
+            text.delete_at(1, 6 + i);
+        }
+        assert_eq!(text.line_at(1), "world".to_string());
     }
 }

@@ -21,14 +21,52 @@ struct Size(u16, u16);
 
 struct TextEditor {
     text: Text,
-    text_length: usize,
     cur_pos: Coordinates,
     cur_line: usize,
-    upper_line: usize,
-    lower_line: usize,
+    view: TextView,
     terminal_size: Size,
     file_name: String,
     out: Box<dyn Write>,
+    mode: Mode,
+}
+
+struct TextView {
+    lower_line: usize,
+    upper_line: usize,
+}
+
+impl TextView {
+    pub fn move_down(&mut self, n: usize) {
+        self.upper_line += n;
+        self.lower_line += n;
+    }
+    pub fn move_up(&mut self, n: usize) {
+        assert!(self.upper_line >= 0);
+        if self.upper_line == 0 {
+            return
+        }
+        if n > self.lower_line {
+            self.upper_line -= self.lower_line;
+            self.lower_line = 0;
+        } else {
+            self.upper_line -= n;
+            self.lower_line -= n;
+        }
+    }
+    pub fn upper_line(&self) -> usize{
+        self.upper_line
+    }
+    pub fn lower_line(&self) -> usize{
+        self.lower_line
+    }
+    pub fn shrink_upper(&mut self) {
+        if self.upper_line > 0 {
+            self.upper_line -= 1;
+        }
+    }
+    pub fn expand_upper(&mut self) {
+        self.upper_line += 1;
+    }
 }
 
 
@@ -41,10 +79,7 @@ impl TextEditor {
         }
         let text_length = file_handle.lines().count();
         let size = termion::terminal_size().unwrap();
-        let mut upper_line = size.1 as usize - 1;
-        if text_length < upper_line {
-            upper_line = text_length;
-        }
+        let view = TextView{lower_line: 0, upper_line: text_length.min(size.1 as usize - 1)};
         let mut out = MouseTerminal::from(AlternateScreen::from(BufWriter::with_capacity(
                 1 << 14,
                 stdout(),
@@ -55,14 +90,13 @@ impl TextEditor {
         let out = Box::new(out);
         TextEditor {
             text,
-            text_length,
             cur_pos: Coordinates{x:1,y:1},
             cur_line: 1,
-            lower_line: 0,
-            upper_line,
+            view,
             terminal_size: Size(size.0, size.1),
             file_name: file_name.into(),
             out,
+            mode: Mode::Normal
         }
     }
 
@@ -74,10 +108,7 @@ impl TextEditor {
         }
         let text_length = lines.len();
         let size = termion::terminal_size().unwrap();
-        let mut upper_line = size.1 as usize - 1;
-        if text_length < upper_line {
-            upper_line = text_length;
-        }
+        let view = TextView{lower_line: 0, upper_line: text_length.min(size.1 as usize - 1)};
         let mut out = MouseTerminal::from(AlternateScreen::from(BufWriter::with_capacity(
                 1 << 14,
                 stdout(),
@@ -88,14 +119,13 @@ impl TextEditor {
         let out = Box::new(out);
         TextEditor {
             text,
-            text_length,
             cur_pos: Coordinates{x:1,y:1},
             cur_line: 1,
-            lower_line: 0,
-            upper_line,
+            view,
             terminal_size: Size(size.0, size.1),
             file_name: "test_file".into(),
             out,
+            mode: Mode::Normal
         }
 
     }
@@ -115,7 +145,7 @@ impl TextEditor {
 
     fn print_text(&mut self) {
         write!(self.out, "{}{}", termion::clear::All, termion::cursor::Goto(1,1)).unwrap();
-        for line in self.lower_line..self.upper_line {
+        for line in self.view.lower_line()..self.view.upper_line() {
             writeln!(self.out, "{}\r", self.text.line_at(line as usize)).unwrap();
         }
     }
@@ -129,12 +159,12 @@ impl TextEditor {
         write!(self.out, "{}{} line-count={} filename: {}, size: ({}, {}) line[{}-{}] pos[{}:{}]{}",
                     color::Fg(color::Blue),
                     style::Bold,
-                    self.text_length,
+                    self.text_length(),
                     self.file_name,
                     self.terminal_size.0,
                     self.terminal_size.1,
-                    self.lower_line,
-                    self.upper_line,
+                    self.view.lower_line(),
+                    self.view.upper_line(),
                     self.cur_pos.x,
                     self.cur_pos.y,
                     style::Reset
@@ -161,9 +191,22 @@ impl TextEditor {
 
     fn len_of_cur_line(&self) -> usize {
         assert!(self.cur_line != 0);
-        1.max(self.text.len_of_line_at(self.cur_line - 1))
+        if self.mode == Mode::Normal {
+            1.max(self.text.len_of_line_at(self.cur_line - 1))
+        } else if self.mode == Mode::Insert {
+            1.max(self.text.len_of_line_at(self.cur_line - 1) + 1)
+        } else {
+            unimplemented!()
+        }
     }
 
+    fn text_length(&self) -> usize {
+        self.text.len()
+    }
+
+    fn cursor_at_end_of_line(&mut self) -> bool {
+        self.cur_pos.x == self.len_of_cur_line()
+    }
     fn move_to_end_of_line(&mut self) {
         self.cur_pos.x = self.len_of_cur_line();
         self.flush();
@@ -188,12 +231,11 @@ impl TextEditor {
         if self.cur_pos.y < self.max_y().into() {
             self.cur_pos.y += 1;
         } else {
-            if self.upper_line < self.text_length {
-                self.lower_line += 1;
-                self.upper_line += 1;
+            if self.view.upper_line() < self.text_length() {
+                self.view.move_down(1);
             }
         }
-        if self.cur_line < self.text_length {
+        if self.cur_line < self.text_length() {
             self.cur_line += 1;
         }
         self.flush();
@@ -202,10 +244,7 @@ impl TextEditor {
         if self.cur_pos.y > 1 {
             self.cur_pos.y -= 1;
         } else {
-            if self.lower_line > 0 {
-                self.lower_line -= 1;
-                self.upper_line -= 1;
-            }
+            self.view.move_up(1);
 
         }
         if self.cur_line > 1 {
@@ -291,10 +330,7 @@ impl TextEditor {
                 if self.cur_pos.y > 1 {
                     self.cur_pos.y -= 1;
                 } else {
-                    if self.upper_line > 0 {
-                        self.lower_line -= 1;
-                        self.upper_line -= 1;
-                    }
+                    self.view.move_up(1);
                 }
                 self.cur_line -= 1;
                 self.cur_pos.x = self.len_of_cur_line();
@@ -311,14 +347,13 @@ impl TextEditor {
     // please note, this function DO NOT flush
     fn forward_to_next_char(&mut self) -> bool {
         if self.cur_pos.x == self.len_of_cur_line(){
-            if self.cur_line < self.text_length  {
+            if self.cur_line < self.text_length()  {
                 // move to the start of next line
                 if self.cur_pos.y < self.max_y().into() {
                     self.cur_pos.y += 1;
                 } else {
-                    if self.upper_line < self.text_length {
-                        self.lower_line += 1;
-                        self.upper_line += 1;
+                    if self.view.upper_line() < self.text_length() {
+                        self.view.move_down(1);
                     }
                 }
                 self.cur_line += 1;
@@ -342,14 +377,22 @@ impl TextEditor {
     fn is_blank(c: char) -> bool {
         c == ' ' || c == '\n' || c == '\t'
     }
+    pub fn change_mode_immediately(&mut self, mode: Mode) {
+        self.mode = mode;
+    }
+    pub fn delete_line_at(&mut self, index: usize) {
+        self.text.delete_line_at(index);
+        if self.text_length() < self.terminal_size.1 as usize - 1 {
+            self.view.shrink_upper();
+        }
+    }
     fn run(&mut self) {
         self.flush();
         self.out.flush().unwrap();
         let stdin = stdin();
-        let mut mode = Mode::Normal;
         for c in stdin.keys() {
-            mode = mode.handle(self, c.unwrap());
-            if mode == Mode::Exit {
+            self.mode = self.mode.clone().handle(self, c.unwrap());
+            if self.mode == Mode::Exit {
                 break;
             }
             self.out.flush().unwrap();
@@ -361,7 +404,7 @@ impl TextEditor {
 
 
 fn main() {
-    let args: Vec<String> = args().collect();
+let args: Vec<String> = args().collect();
     if args.len() < 2 {
         println!("Please provide file name as arguments");
         std::process::exit(0);
