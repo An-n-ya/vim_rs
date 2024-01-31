@@ -172,5 +172,7 @@ mod tests {
         assert_eq!(editor.cur_char(), 'w');
         handle_keys(&mut editor, vec![Key::Char('b')]);
         assert_eq!(editor.cur_char(), 'h');
+        handle_keys(&mut editor, vec![Key::Char('w')]);
+        assert_eq!(editor.cur_char(), 'w');
     }
 }

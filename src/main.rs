@@ -269,7 +269,13 @@ impl TextEditor {
     }
     fn forward_to_start_of_next_word(&mut self) {
         while Self::is_alphabet(self.cur_char()) {
-            self.forward_to_next_char();
+            let old_line = self.cur_line;
+            if !self.forward_to_next_char() {
+                return;
+            }
+            if self.cur_line != old_line {
+                break;
+            }
         }
         // we are currently in blank char, need to find the next word
         while !Self::is_alphabet(self.cur_char()) {
