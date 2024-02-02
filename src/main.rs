@@ -239,7 +239,7 @@ impl TextEditor {
         self.flush();
     }
     fn inc_y(&mut self) {
-        if self.cur_pos.y < self.max_y().into() {
+        if self.cur_pos.y < self.max_y().min(self.text_length() as u16).into() {
             self.cur_pos.y += 1;
         } else {
             if self.view.upper_line() < self.text_length() {
@@ -377,6 +377,15 @@ impl TextEditor {
         } else {
             self.cur_pos.x += 1;
             return true;
+        }
+    }
+    fn new_line(&mut self) {
+        self.text.new_line_at(self.cur_pos.y - 1, self.cur_pos.x - 1);
+        self.flush();
+        self.inc_y();
+        self.move_to_start_of_line();
+        if self.text_length() < self.terminal_size.1 as usize - 1 {
+            self.view.expand_upper();
         }
     }
     fn cur_char(&mut self) -> char {

@@ -122,6 +122,7 @@ impl Mode {
             Key::Char(c) => {
                 if c == '\n' {
                     // TODO: considering expand the upper
+                    editor.new_line();
                     return Mode::Insert;
                 }
                 let x = editor.cur_line - 1;

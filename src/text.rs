@@ -50,6 +50,14 @@ impl Text {
         self.lines[line].clone()
     }
 
+    pub fn new_line_at(&mut self, x: usize, index: usize) {
+        let x = x.min(self.lines.len() - 1);
+        let index = index.min(self.lines[x].len());
+        let latter = self.lines[x][index..].to_string();
+        self.lines[x].truncate(index);
+        self.add_line_before(x + 1, latter);
+    }
+
     pub fn push_line(&mut self, content: String) {
         self.lines.push(content);
     }
@@ -83,5 +91,14 @@ mod tests {
             text.delete_at(1, 6 + i);
         }
         assert_eq!(text.line_at(1), "world".to_string());
+    }
+
+    #[test]
+    fn new_line() {
+        let lines = vec!["hello".to_string(), "world".to_string()];
+        let mut text = Text{lines};
+        text.new_line_at(1, 2);
+        assert_eq!(text.line_at(1), "wo");
+        assert_eq!(text.line_at(2), "rld");
     }
 }
