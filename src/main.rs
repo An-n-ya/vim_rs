@@ -109,12 +109,10 @@ impl TextEditor {
         let text_length = lines.len();
         let size = termion::terminal_size().unwrap();
         let view = TextView{lower_line: 0, upper_line: text_length.min(size.1 as usize - 1)};
-        let mut out = MouseTerminal::from(AlternateScreen::from(BufWriter::with_capacity(
+        let mut out = BufWriter::with_capacity(
                 1 << 14,
-                stdout(),
-            )))
-            .into_raw_mode()
-            .unwrap();
+                vec![],
+            );
         write!(out, "{}", termion::cursor::Show).unwrap();
         let out = Box::new(out);
         TextEditor {
@@ -214,6 +212,19 @@ impl TextEditor {
     fn move_to_start_of_line(&mut self) {
         self.cur_pos.x = 1;
         self.flush();
+    }
+    fn move_to_first_char_of_line(&mut self) {
+        self.cur_pos.x = 1;
+        while self.cur_pos.x < self.len_of_cur_line() {
+            if Self::is_blank(self.cur_char()) {
+                self.cur_pos.x += 1;
+            } else {
+                self.flush();
+                return
+            }
+        }
+        self.flush();
+        return
     }
     fn inc_x(&mut self) {
         if self.cur_pos.x < self.len_of_cur_line() {

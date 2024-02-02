@@ -49,6 +49,12 @@ impl Mode {
                     editor.set_cursor_style(crate::CursorStyle::Bar);
                     Mode::Insert
                 },
+                Key::Char('I') => {
+                    editor.change_mode_immediately(Mode::Insert);
+                    editor.move_to_first_char_of_line();
+                    editor.set_cursor_style(crate::CursorStyle::Bar);
+                    Mode::Insert
+                },
                 Key::Char('$') => {
                     editor.move_to_end_of_line();
                     Mode::Normal
@@ -204,6 +210,10 @@ mod tests {
         }
     }
 
+    fn exit(editor: &mut TextEditor) {
+        handle_keys(editor, vec![Key::Ctrl('q')]);
+    }
+
     #[test]
     fn basic_insert() {
         let mut editor = init(vec!["hello".to_string(), "world".to_string()]);
@@ -237,6 +247,18 @@ mod tests {
         ];
         handle_keys(&mut editor, keys);
         assert_eq!(editor.text.line_at(0), "a hello test");
+
+        let keys = vec![
+            Key::Char('I'),
+            Key::Char('a'),
+            Key::Char(' '),
+            Key::Esc,
+        ];
+        handle_keys(&mut editor, keys);
+        assert_eq!(editor.text.line_at(0), "a a hello test");
+
+
+        exit(&mut editor);
     }
 
     #[test]
@@ -256,6 +278,8 @@ mod tests {
         assert_eq!(editor.cur_char(), 'w');
         handle_keys(&mut editor, vec![Key::Backspace, Key::Backspace]);
         assert_eq!(editor.cur_char(), 'l');
+
+        exit(&mut editor);
     }
 
     #[test]
@@ -295,5 +319,7 @@ mod tests {
         handle_keys(&mut editor, keys);
         assert_eq!(editor.text.line_at(0), "");
         assert_eq!(editor.text_length(), 1);
+
+        exit(&mut editor);
     }
 }
