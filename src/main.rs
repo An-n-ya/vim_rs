@@ -207,11 +207,9 @@ impl TextEditor {
     }
     fn move_to_end_of_line(&mut self) {
         self.cur_pos.x = self.len_of_cur_line();
-        self.flush();
     }
     fn move_to_start_of_line(&mut self) {
         self.cur_pos.x = 1;
-        self.flush();
     }
     fn move_to_first_char_of_line(&mut self) {
         self.cur_pos.x = 1;
@@ -219,24 +217,19 @@ impl TextEditor {
             if Self::is_blank(self.cur_char()) {
                 self.cur_pos.x += 1;
             } else {
-                self.flush();
                 return
             }
         }
-        self.flush();
-        return
     }
     fn inc_x(&mut self) {
         if self.cur_pos.x < self.len_of_cur_line() {
             self.cur_pos.x += 1;
         }
-        self.flush();
     }
     fn dec_x(&mut self) {
         if self.cur_pos.x > 1 {
             self.cur_pos.x -= 1;
         }
-        self.flush();
     }
     fn inc_y(&mut self) {
         if self.cur_pos.y < self.max_y().min(self.text_length() as u16).into() {
@@ -249,7 +242,6 @@ impl TextEditor {
         if self.cur_line < self.text_length() {
             self.cur_line += 1;
         }
-        self.flush();
     }
     fn dec_y(&mut self) {
         if self.cur_pos.y > 1 {
@@ -261,7 +253,6 @@ impl TextEditor {
         if self.cur_line > 1 {
             self.cur_line -= 1;
         }
-        self.flush();
     }
     fn forward_to_end_of_cur_word(&mut self) {
         assert!(Self::is_alphabet(self.cur_char()));
@@ -300,7 +291,6 @@ impl TextEditor {
             }
         }
         self.forward_to_start_of_cur_word();
-        self.flush()
     }
     fn forward_to_end_of_next_word(&mut self) {
         self.forward_to_next_char();
@@ -314,8 +304,6 @@ impl TextEditor {
             }
         }
         self.forward_to_end_of_cur_word();
-
-        self.flush()
     }
     fn forward_to_start_of_next_word(&mut self) {
         while Self::is_alphabet(self.cur_char()) {
@@ -331,9 +319,7 @@ impl TextEditor {
         while !Self::is_alphabet(self.cur_char()) {
             self.forward_to_next_char();
         }
-        self.flush()
     }
-    // please note, this function DO NOT flush
     fn backward_to_next_char(&mut self) -> bool {
         if self.cur_pos.x == 1 {
             if self.cur_line > 1 {
@@ -355,7 +341,6 @@ impl TextEditor {
             return true;
         }
     }
-    // please note, this function DO NOT flush
     fn forward_to_next_char(&mut self) -> bool {
         if self.cur_pos.x == self.len_of_cur_line(){
             if self.cur_line < self.text_length()  {
@@ -381,7 +366,6 @@ impl TextEditor {
     }
     fn new_line(&mut self) {
         self.text.new_line_at(self.cur_pos.y - 1, self.cur_pos.x - 1);
-        self.flush();
         self.inc_y();
         self.move_to_start_of_line();
         if self.text_length() < self.terminal_size.1 as usize - 1 {
@@ -415,6 +399,7 @@ impl TextEditor {
             if self.mode == Mode::Exit {
                 break;
             }
+            self.flush();
             self.out.flush().unwrap();
         }
     }

@@ -87,7 +87,10 @@ impl Mode {
                 },
                 Key::Backspace => {
                     editor.backward_to_next_char();
-                    editor.flush();
+                    Mode::Normal
+                },
+                Key::Char(' ') => {
+                    editor.forward_to_next_char();
                     Mode::Normal
                 },
                 Key::Char('i') => {
@@ -121,8 +124,12 @@ impl Mode {
         match key {
             Key::Char(c) => {
                 if c == '\n' {
-                    // TODO: considering expand the upper
                     editor.new_line();
+                    return Mode::Insert;
+                }
+                if c == '\t' {
+                    // TODO: tab feature
+                    // just add four spaces
                     return Mode::Insert;
                 }
                 let x = editor.cur_line - 1;
