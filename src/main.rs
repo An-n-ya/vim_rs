@@ -364,6 +364,21 @@ impl TextEditor {
             return true;
         }
     }
+    fn new_line_ahead(&mut self) {
+        self.text.add_line_before(self.cur_pos.y - 1, "".to_string());
+        self.move_to_start_of_line();
+        if self.text_length() < self.terminal_size.1 as usize - 1 {
+            self.view.expand_upper();
+        }
+    }
+    fn new_line_behind(&mut self) {
+        self.text.new_line_at(self.cur_pos.y - 1, self.len_of_cur_line());
+        self.inc_y();
+        self.move_to_start_of_line();
+        if self.text_length() < self.terminal_size.1 as usize - 1 {
+            self.view.expand_upper();
+        }
+    }
     fn new_line(&mut self) {
         self.text.new_line_at(self.cur_pos.y - 1, self.cur_pos.x - 1);
         self.inc_y();

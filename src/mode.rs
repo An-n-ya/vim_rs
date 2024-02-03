@@ -93,6 +93,16 @@ impl Mode {
                     editor.forward_to_next_char();
                     Mode::Normal
                 },
+                Key::Char('o') => {
+                    editor.set_cursor_style(crate::CursorStyle::Bar);
+                    editor.new_line_behind();
+                    Mode::Insert
+                },
+                Key::Char('O') => {
+                    editor.set_cursor_style(crate::CursorStyle::Bar);
+                    editor.new_line_ahead();
+                    Mode::Insert
+                },
                 Key::Char('i') => {
                     editor.set_cursor_style(crate::CursorStyle::Bar);
                     Mode::Insert
@@ -265,6 +275,18 @@ mod tests {
         handle_keys(&mut editor, keys);
         assert_eq!(editor.text.line_at(0), "a a hello test");
 
+        let keys = vec![
+            Key::Char('o'),
+            Key::Char('n'),
+            Key::Esc,
+            Key::Char('O'),
+            Key::Char('N'),
+            Key::Esc,
+        ];
+        handle_keys(&mut editor, keys);
+        assert_eq!(editor.text.line_at(1), "N");
+        assert_eq!(editor.text.line_at(2), "n");
+
 
         exit(&mut editor);
     }
@@ -286,6 +308,12 @@ mod tests {
         assert_eq!(editor.cur_char(), 'w');
         handle_keys(&mut editor, vec![Key::Backspace, Key::Backspace]);
         assert_eq!(editor.cur_char(), 'l');
+        handle_keys(&mut editor, vec![Key::Char(' ')]);
+        assert_eq!(editor.cur_char(), 'o');
+        handle_keys(&mut editor, vec![Key::Char('0')]);
+        assert_eq!(editor.cur_char(), 'h');
+        handle_keys(&mut editor, vec![Key::Char('$')]);
+        assert_eq!(editor.cur_char(), 'o');
 
         exit(&mut editor);
     }
