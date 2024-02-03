@@ -154,7 +154,7 @@ impl TextEditor {
 
     fn show_bar(&mut self) {
         write!(self.out, "{}",termion::cursor::Goto(0, (self.terminal_size.1) as u16)).unwrap();
-        write!(self.out, "{}{} line-count={} filename: {}, size: ({}, {}) line[{}-{}] pos[{}:{}]{}",
+        write!(self.out, "{}{} line-count={} filename: {}, size: ({}, {}) line[{}-{}] pos[{}:{}] mode:{}{}",
                     color::Fg(color::Blue),
                     style::Bold,
                     self.text_length(),
@@ -165,6 +165,7 @@ impl TextEditor {
                     self.view.upper_line(),
                     self.cur_pos.x,
                     self.cur_pos.y,
+                    self.mode,
                     style::Reset
                 ).unwrap();
     }

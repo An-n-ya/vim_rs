@@ -2,13 +2,27 @@ use termion::event::Key;
 
 use crate::TextEditor;
 
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Mode {
     Normal,
     Visual,
     Insert,
     Command,
     Exit
+}
+
+impl std::fmt::Display for Mode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Mode::Normal => "NORMAL",
+            Mode::Visual => "VISUAL",
+            Mode::Insert => "INSERT",
+            Mode::Command => "COMMAND",
+            Mode::Exit => "EXIT",
+        };
+
+        write!(f, "{}", s)
+    }
 }
 
 impl Mode {
