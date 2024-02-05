@@ -1,6 +1,6 @@
 use termion::event::Key;
 
-use crate::TextEditor;
+use crate::{command::Action, TextEditor};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Mode {
@@ -61,12 +61,14 @@ impl Mode {
                     editor.change_mode_immediately(Mode::Insert);
                     editor.move_to_end_of_line();
                     editor.set_cursor_style(crate::CursorStyle::Bar);
+                    editor.action_stack.add_action(Action::Insert, editor.cur_line, editor.cur_pos);
                     Mode::Insert
                 },
                 Key::Char('I') => {
                     editor.change_mode_immediately(Mode::Insert);
                     editor.move_to_first_char_of_line();
                     editor.set_cursor_style(crate::CursorStyle::Bar);
+                    editor.action_stack.add_action(Action::Insert, editor.cur_line, editor.cur_pos);
                     Mode::Insert
                 },
                 Key::Char('$') => {
@@ -90,17 +92,23 @@ impl Mode {
                     Mode::Normal
                 },
                 Key::Char('u') => {
-                    todo!();
+                    let action = editor.action_stack.backward();
+                    editor.revoke_action(action);
                     Mode::Normal
                 },
                 Key::Char('a') => {
                     editor.change_mode_immediately(Mode::Insert);
                     editor.inc_x();
                     editor.set_cursor_style(crate::CursorStyle::Bar);
+                    editor.action_stack.add_action(Action::Insert, editor.cur_line, editor.cur_pos);
                     Mode::Insert
                 },
                 Key::Backspace => {
                     editor.backward_to_next_char();
+                    Mode::Normal
+                },
+                Key::Char('x') => {
+                    editor.delete_cur_char();
                     Mode::Normal
                 },
                 Key::Char(' ') => {
@@ -110,15 +118,18 @@ impl Mode {
                 Key::Char('o') => {
                     editor.set_cursor_style(crate::CursorStyle::Bar);
                     editor.new_line_behind();
+                    editor.action_stack.add_action(Action::Insert, editor.cur_line, editor.cur_pos);
                     Mode::Insert
                 },
                 Key::Char('O') => {
                     editor.set_cursor_style(crate::CursorStyle::Bar);
                     editor.new_line_ahead();
+                    editor.action_stack.add_action(Action::Insert, editor.cur_line, editor.cur_pos);
                     Mode::Insert
                 },
                 Key::Char('i') => {
                     editor.set_cursor_style(crate::CursorStyle::Bar);
+                    editor.action_stack.add_action(Action::Insert, editor.cur_line, editor.cur_pos);
                     Mode::Insert
                 },
                 Key::Char(':') => {
@@ -149,37 +160,43 @@ impl Mode {
             Key::Char(c) => {
                 if c == '\n' {
                     editor.new_line();
-                    return Mode::Insert;
                 }
-                if c == '\t' {
+                else if c == '\t' {
                     let x = editor.cur_line - 1;
                     let y = editor.cur_pos.x - 1;
                     for _ in 0..4 {
                         editor.text.insert_at(x, y, ' ');
                         editor.inc_x();
                     }
-                    return Mode::Insert;
+                } else {
+                    let x = editor.cur_line - 1;
+                    let y = editor.cur_pos.x - 1;
+                    editor.text.insert_at(x, y, c);
+                    editor.inc_x();
                 }
-                let x = editor.cur_line - 1;
-                let y = editor.cur_pos.x - 1;
-                editor.text.insert_at(x, y, c);
-                editor.inc_x();
+                if !editor.revoking_action {
+                    editor.action_stack.append_key_to_top(key);
+                }
                 Mode::Insert
             },
             Key::Left => {
                 editor.dec_x();
+                editor.action_stack.add_action(Action::Insert, editor.cur_line, editor.cur_pos);
                 Mode::Insert
             },
             Key::Down => {
                 editor.inc_y();
+                editor.action_stack.add_action(Action::Insert, editor.cur_line, editor.cur_pos);
                 Mode::Insert
             },
             Key::Up => {
                 editor.dec_y();
+                editor.action_stack.add_action(Action::Insert, editor.cur_line, editor.cur_pos);
                 Mode::Insert
             },
             Key::Right => {
                 editor.inc_x();
+                editor.action_stack.add_action(Action::Insert, editor.cur_line, editor.cur_pos);
                 Mode::Insert
             },
             Key::Backspace => {
@@ -195,6 +212,14 @@ impl Mode {
                     editor.text.delete_at(x, y);
                     editor.dec_x();
                 }
+                if !editor.revoking_action {
+                    editor.action_stack.discard_key_on_top();
+                }
+                Mode::Insert
+            },
+            Key::Delete => {
+                editor.delete_cur_char();
+                // TODO: add action
                 Mode::Insert
             },
             Key::Esc => {
@@ -353,7 +378,31 @@ mod tests {
         handle_keys(&mut editor, keys);
         assert_eq!(editor.text.line_at(0), "hello");
         assert_eq!(editor.text.line_at(1), "");
+
+
         let keys = vec![
+            Key::Char('k'),
+            Key::Char('x'),
+            Key::Esc,
+        ];
+        handle_keys(&mut editor, keys);
+        assert_eq!(editor.text.line_at(0), "ello");
+        assert_eq!(editor.text.line_at(1), "");
+
+        let keys = vec![
+            Key::Char('a'),
+            Key::Delete,
+            Key::Delete,
+            Key::Esc,
+        ];
+        handle_keys(&mut editor, keys);
+        assert_eq!(editor.text.line_at(0), "eo");
+        assert_eq!(editor.text.line_at(1), "");
+
+
+        let keys = vec![
+            Key::Char('j'),
+            Key::Char('A'),
             Key::Char('i'),
             Key::Backspace,
             Key::Backspace,
@@ -375,5 +424,32 @@ mod tests {
         assert_eq!(editor.text_length(), 1);
 
         exit(&mut editor);
+    }
+
+    #[test]
+    fn revoke_test() {
+        let mut editor = init(vec!["hello".to_string(), "world".to_string()]);
+
+        let keys = vec![
+            Key::Char('l'),
+            Key::Char('a'),
+            Key::Char('b'),
+            Key::Char('\n'),
+            Key::Esc,
+        ];
+        handle_keys(&mut editor, keys);
+        assert_eq!(editor.text.line_at(0), "heb");
+        assert_eq!(editor.text.line_at(1), "llo");
+
+
+        let keys = vec![
+            Key::Char('u'),
+            Key::Esc,
+        ];
+        handle_keys(&mut editor, keys);
+        assert_eq!(editor.text.line_at(0), "hello");
+        assert_eq!(editor.text.line_at(1), "world");
+
+
     }
 }

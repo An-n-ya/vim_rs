@@ -1,12 +1,17 @@
 mod mode;
 mod text;
+mod command;
+mod task;
 
 use std::{env::args, fs, io::{stdout, stdin, Write, Stdout, BufWriter}, cell::RefCell, vec, process::Stdio};
+use command::{Action, ActionStack, CmdAction};
+use task::Task;
 use termion::{color, style, raw::{IntoRawMode, RawTerminal}, input::{TermRead, MouseTerminal}, event::Key, screen::AlternateScreen};
 use text::Text;
 use crate::mode::Mode;
 
-struct Coordinates {
+#[derive(Clone, Copy)]
+pub struct Coordinates {
     pub x: usize,
     pub y: usize
 }
@@ -28,6 +33,9 @@ struct TextEditor {
     file_name: String,
     out: Box<dyn Write>,
     mode: Mode,
+    task: Task,
+    action_stack: ActionStack,
+    revoking_action: bool,
 }
 
 struct TextView {
@@ -96,7 +104,10 @@ impl TextEditor {
             terminal_size: Size(size.0, size.1),
             file_name: file_name.into(),
             out,
-            mode: Mode::Normal
+            mode: Mode::Normal,
+            task: Task::default(),
+            action_stack: ActionStack::default(),
+            revoking_action: false
         }
     }
 
@@ -123,7 +134,10 @@ impl TextEditor {
             terminal_size: Size(size.0, size.1),
             file_name: "test_file".into(),
             out,
-            mode: Mode::Normal
+            mode: Mode::Normal,
+            task: Task::default(),
+            action_stack: ActionStack::default(),
+            revoking_action: false
         }
 
     }
@@ -186,6 +200,35 @@ impl TextEditor {
 
     fn update_pos(&mut self) {
         write!(self.out, "{}", termion::cursor::Goto(self.cur_pos.x as u16, self.cur_pos.y as u16)).unwrap();
+    }
+
+    pub fn revoke_action(&mut self, action: Option<CmdAction>) {
+        self.revoking_action = true;
+
+        if let Some(action) = action {
+            let pos = action.pos;
+            let cur_line = action.cur_line;
+            self.set_pos(pos.x, pos.y);
+            self.cur_line = cur_line;
+            match action.action {
+                Action::Delete => {
+
+                },
+                Action::Insert => {
+                    action.contents.iter().for_each(|&a| {
+                        if a == Key::Char('\t') {
+                            for _ in 0..4 {
+                                self.delete_cur_char();
+                            }
+                        } else {
+                            self.delete_cur_char();
+                        }
+                    })
+                }
+            }
+        }
+
+        self.revoking_action = false;
     }
 
     fn len_of_cur_line(&self) -> usize {
@@ -400,11 +443,25 @@ impl TextEditor {
     pub fn change_mode_immediately(&mut self, mode: Mode) {
         self.mode = mode;
     }
-    pub fn delete_line_at(&mut self, index: usize) {
-        self.text.delete_line_at(index);
+    pub fn delete_line_at(&mut self, index: usize) -> String {
+        let res = self.text.delete_line_at(index);
         if self.text_length() < self.terminal_size.1 as usize - 1 {
             self.view.shrink_upper();
         }
+        res
+    }
+
+    pub fn delete_cur_char(&mut self) {
+
+        if self.cur_char() == 0 as char {
+            if self.cur_line < self.text_length() {
+                let contents = self.delete_line_at(self.cur_line);
+                self.text.append_str_at(self.cur_line - 1, self.len_of_cur_line(), contents);
+            }
+        } else {
+            self.text.delete_at(self.cur_line - 1, self.cur_pos.x);
+        }
+
     }
     fn run(&mut self) {
         self.flush();

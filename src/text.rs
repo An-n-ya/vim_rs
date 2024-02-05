@@ -9,11 +9,9 @@ impl Text {
         }
     }
     pub fn char_at(&mut self, x: usize, y: usize) -> char {
-        let x = x.min(self.lines.len() - 1);
-        if self.lines[x].len() == 0 {
+        if x >= self.lines.len() || self.lines[x].len() == 0 || y >= self.lines[x].len() {
             return 0 as char
         }
-        let y = y.min(self.lines[x].len() - 1);
         self.lines[x].chars().nth(y).unwrap()
     }
     pub fn insert_at(&mut self, x: usize, y: usize, c: char) {
@@ -28,9 +26,14 @@ impl Text {
         self.lines.len()
     }
 
-    pub fn delete_line_at(&mut self, x: usize) {
+    pub fn delete_line_at(&mut self, x: usize) -> String {
         let x = x.min(self.lines.len() - 1);
-        self.lines.remove(x);
+        self.lines.remove(x)
+    }
+    pub fn append_str_at(&mut self, x: usize, y: usize, s: String) {
+        let x = x.min(self.lines.len() - 1);
+        let y = y.min(self.lines[x].len());
+        self.lines[x].insert_str(y, &s);
     }
     pub fn delete_at(&mut self, x: usize, y: usize) {
         let x = x.min(self.lines.len() - 1);
@@ -91,6 +94,12 @@ mod tests {
             text.delete_at(1, 6 + i);
         }
         assert_eq!(text.line_at(1), "world".to_string());
+        text.append_str_at(1, 5, " and happy everyday!".to_string());
+        assert_eq!(text.line_at(1), "world and happy everyday!".to_string());
+        text.delete_line_at(1);
+        assert_eq!(text.len(), 1);
+        assert_eq!(text.char_at(1, 0), 0 as char);
+
     }
 
     #[test]
