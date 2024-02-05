@@ -152,8 +152,12 @@ impl Mode {
                     return Mode::Insert;
                 }
                 if c == '\t' {
-                    // TODO: tab feature
-                    // just add four spaces
+                    let x = editor.cur_line - 1;
+                    let y = editor.cur_pos.x - 1;
+                    for _ in 0..4 {
+                        editor.text.insert_at(x, y, ' ');
+                        editor.inc_x();
+                    }
                     return Mode::Insert;
                 }
                 let x = editor.cur_line - 1;
