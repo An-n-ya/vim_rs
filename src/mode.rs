@@ -36,7 +36,7 @@ impl Mode {
         }
     }
 
-    fn handle_normal(editor: &mut TextEditor, key: Key) -> Self {
+    pub fn handle_normal(editor: &mut TextEditor, key: Key) -> Self {
         match key {
                 Key::Ctrl('q') => {
                     Mode::Exit
@@ -91,6 +91,11 @@ impl Mode {
                     editor.backward_to_start_of_next_word();
                     Mode::Normal
                 },
+                Key::Ctrl('r') => {
+                    let action = editor.action_stack.forward();
+                    editor.restore_action(action);
+                    Mode::Normal
+                },
                 Key::Char('u') => {
                     let action = editor.action_stack.backward();
                     editor.revoke_action(action);
@@ -108,12 +113,19 @@ impl Mode {
                     Mode::Normal
                 },
                 Key::Char('x') => {
-                    editor.delete_cur_char();
+                    let c = editor.delete_cur_char();
+                    editor.action_stack.add_action(Action::Delete, editor.cur_line, editor.cur_pos);
+                    if let Some(c) = c {
+                        if !editor.processing_action {
+                            editor.action_stack.append_key_to_top(Key::Char(c));
+                        }
+                    }
                     Mode::Normal
                 },
                 Key::Char('s') => {
                     editor.delete_cur_char();
                     editor.set_cursor_style(crate::CursorStyle::Bar);
+                    // FIXME: substitute action conclude both insert and delete
                     editor.action_stack.add_action(Action::Insert, editor.cur_line, editor.cur_pos);
                     Mode::Insert
                 },
@@ -121,6 +133,7 @@ impl Mode {
                     editor.delete_cur_line();
                     editor.set_cursor_style(crate::CursorStyle::Bar);
                     editor.new_line_ahead();
+                    // FIXME: substitute action conclude both insert and delete
                     editor.action_stack.add_action(Action::Insert, editor.cur_line, editor.cur_pos);
                     Mode::Insert
                 },
@@ -167,7 +180,7 @@ impl Mode {
             _ => Mode::Visual
         }
     }
-    fn handle_insert(editor: &mut TextEditor, key: Key) -> Self {
+    pub fn handle_insert(editor: &mut TextEditor, key: Key) -> Self {
 
         match key {
             Key::Char(c) => {
@@ -187,7 +200,7 @@ impl Mode {
                     editor.text.insert_at(x, y, c);
                     editor.inc_x();
                 }
-                if !editor.revoking_action {
+                if !editor.processing_action {
                     editor.action_stack.append_key_to_top(key);
                 }
                 Mode::Insert
@@ -225,7 +238,7 @@ impl Mode {
                     editor.text.delete_at(x, y);
                     editor.dec_x();
                 }
-                if !editor.revoking_action {
+                if !editor.processing_action {
                     editor.action_stack.discard_key_on_top();
                 }
                 Mode::Insert
@@ -457,7 +470,7 @@ mod tests {
     }
 
     #[test]
-    fn revoke_test() {
+    fn revoke_and_restore_test() {
         let mut editor = init(vec!["hello".to_string(), "world".to_string()]);
 
         let keys = vec![
@@ -480,6 +493,32 @@ mod tests {
         assert_eq!(editor.text.line_at(0), "hello");
         assert_eq!(editor.text.line_at(1), "world");
 
+        let keys = vec![
+            Key::Ctrl('r'),
+            Key::Esc,
+        ];
+        handle_keys(&mut editor, keys);
+        assert_eq!(editor.text.line_at(0), "heb");
+        assert_eq!(editor.text.line_at(1), "llo");
+        assert_eq!(editor.text.line_at(2), "world");
 
+        let keys = vec![
+            Key::Char('x'),
+            Key::Esc,
+        ];
+        handle_keys(&mut editor, keys);
+        assert_eq!(editor.text.line_at(1), "lo");
+        let keys = vec![
+            Key::Char('u'),
+            Key::Esc,
+        ];
+        handle_keys(&mut editor, keys);
+        assert_eq!(editor.text.line_at(1), "llo");
+        let keys = vec![
+            Key::Ctrl('r'),
+            Key::Esc,
+        ];
+        handle_keys(&mut editor, keys);
+        assert_eq!(editor.text.line_at(1), "lo");
     }
 }

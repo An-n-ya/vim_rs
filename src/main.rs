@@ -36,7 +36,7 @@ struct TextEditor {
     mode: Mode,
     task: Task,
     action_stack: ActionStack,
-    revoking_action: bool,
+    processing_action: bool,
 }
 
 struct TextView {
@@ -107,7 +107,7 @@ impl TextEditor {
             mode: Mode::Normal,
             task: Task::default(),
             action_stack: ActionStack::default(),
-            revoking_action: false
+            processing_action: false
         }
     }
 
@@ -137,7 +137,7 @@ impl TextEditor {
             mode: Mode::Normal,
             task: Task::default(),
             action_stack: ActionStack::default(),
-            revoking_action: false
+            processing_action: false
         }
 
     }
@@ -203,7 +203,7 @@ impl TextEditor {
     }
 
     pub fn revoke_action(&mut self, action: Option<CmdAction>) {
-        self.revoking_action = true;
+        self.processing_action = true;
 
         if let Some(action) = action {
             let pos = action.pos;
@@ -212,7 +212,12 @@ impl TextEditor {
             self.cur_line = cur_line;
             match action.action {
                 Action::Delete => {
-
+                    action.contents.iter().for_each(|&a| {
+                        match a {
+                            Key::Char(c) => self.insert_char_at_cur(c),
+                            _ => unreachable!()
+                        }
+                    })
                 },
                 Action::Insert => {
                     action.contents.iter().for_each(|&a| {
@@ -228,7 +233,36 @@ impl TextEditor {
             }
         }
 
-        self.revoking_action = false;
+        self.processing_action = false;
+    }
+
+    pub fn restore_action(&mut self, action: Option<CmdAction>)  {
+        self.processing_action = true;
+        if let Some(action) = action {
+            let pos = action.pos;
+            let cur_line = action.cur_line;
+            self.set_pos(pos.x, pos.y);
+            self.cur_line = cur_line;
+            match action.action {
+                Action::Insert => {
+                    action.contents.iter().for_each(|&a| {
+                        if cfg!(test) {
+                            println!("restoring insert key:{:?}", a);
+                        }
+                        Mode::handle_insert(self, a);
+                    })
+                },
+                Action::Delete => {
+                    action.contents.iter().for_each(|&_a| {
+                        // consider restoring `dd`
+                        Mode::handle_normal(self, Key::Char('x'));
+                    })
+
+                },
+            }
+        }
+        self.processing_action = false;
+
     }
 
     fn len_of_cur_line(&self) -> usize {
@@ -458,17 +492,28 @@ impl TextEditor {
         res
     }
 
-    pub fn delete_cur_char(&mut self) {
-
+    pub fn delete_cur_char(&mut self) -> Option<char> {
         if self.cur_char() == 0 as char {
             if self.cur_line < self.text_length() {
                 let contents = self.delete_line_at(self.cur_line);
                 self.text.append_str_at(self.cur_line - 1, self.len_of_cur_line(), contents);
             }
+            None
         } else {
-            self.text.delete_at(self.cur_line - 1, self.cur_pos.x);
+            self.text.delete_at(self.cur_line - 1, self.cur_pos.x)
         }
+    }
 
+    fn insert_char_at_cur(&mut self, c: char) {
+        self.insert_char_at(c, self.cur_line - 1, self.cur_pos.x - 1);
+    }
+
+    fn insert_char_at(&mut self, c: char, x: usize, y: usize) {
+        if c == '\n' {
+            self.new_line();
+        } else {
+            self.text.insert_at(x, y, c)
+        }
     }
     fn run(&mut self) {
         self.flush();

@@ -18,7 +18,7 @@ impl Text {
         let x = x.min(self.lines.len() - 1);
         let y = y.min(self.lines[x].len());
         #[cfg(test)]
-        println!("insert at x={x}, y={y}");
+        println!("insert c={c} at x={x}, y={y}");
         self.lines[x].insert(y, c)
     }
 
@@ -35,13 +35,14 @@ impl Text {
         let y = y.min(self.lines[x].len());
         self.lines[x].insert_str(y, &s);
     }
-    pub fn delete_at(&mut self, x: usize, y: usize) {
+    pub fn delete_at(&mut self, x: usize, y: usize) -> Option<char> {
         let x = x.min(self.lines.len() - 1);
         let y = y.min(self.lines[x].len());
         let y = 0.max(y - 1);
         if self.lines[x].len() > 0 {
-            self.lines[x].remove(y);
+            return Some(self.lines[x].remove(y));
         }
+        None
     }
 
     pub fn len_of_line_at(&self, line: usize) -> usize {

@@ -24,7 +24,7 @@ pub struct ActionStack {
 
 impl ActionStack {
     pub fn forward(&mut self) -> Option<CmdAction> {
-        let action = self.forward_stack.pop().clone();
+        let action = self.forward_stack.pop();
         if action.is_none() {
             return None;
         }
@@ -35,7 +35,7 @@ impl ActionStack {
     }
 
     pub fn backward(&mut self) -> Option<CmdAction> {
-        let action = self.backward_stack.pop().clone();
+        let action = self.backward_stack.pop();
         if action.is_none() {
             return None;
         }
