@@ -3,10 +3,10 @@ mod text;
 mod command;
 mod task;
 
-use std::{env::args, fs, io::{stdout, stdin, Write, Stdout, BufWriter}, cell::RefCell, vec, process::Stdio};
+use std::{env::args, fs, io::{stdout, stdin, Write, BufWriter}};
 use command::{Action, ActionStack, CmdAction};
 use task::Task;
-use termion::{color, style, raw::{IntoRawMode, RawTerminal}, input::{TermRead, MouseTerminal}, event::Key, screen::AlternateScreen};
+use termion::{color, style, raw::IntoRawMode, input::{TermRead, MouseTerminal}, event::Key, screen::AlternateScreen};
 use text::Text;
 use crate::mode::Mode;
 
@@ -16,6 +16,7 @@ pub struct Coordinates {
     pub y: usize
 }
 
+#[allow(dead_code)]
 enum CursorStyle {
     Bar,
     Block,
@@ -49,7 +50,6 @@ impl TextView {
         self.lower_line += n;
     }
     pub fn move_up(&mut self, n: usize) {
-        assert!(self.upper_line >= 0);
         if self.upper_line == 0 {
             return
         }
@@ -445,6 +445,13 @@ impl TextEditor {
     }
     pub fn delete_line_at(&mut self, index: usize) -> String {
         let res = self.text.delete_line_at(index);
+        if self.text_length() < self.terminal_size.1 as usize - 1 {
+            self.view.shrink_upper();
+        }
+        res
+    }
+    pub fn delete_cur_line(&mut self) -> String {
+        let res = self.text.delete_line_at(self.cur_line - 1);
         if self.text_length() < self.terminal_size.1 as usize - 1 {
             self.view.shrink_upper();
         }

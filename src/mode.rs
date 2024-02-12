@@ -31,7 +31,7 @@ impl Mode {
             Mode::Normal => Self::handle_normal(editor, key),
             Mode::Visual => Self::handle_visual(editor, key),
             Mode::Insert => Self::handle_insert(editor, key),
-            Mode::Command => Self::handle_insert(editor, key),
+            Mode::Command => Self::handle_command(editor, key),
             Mode::Exit => unreachable!(),
         }
     }
@@ -110,6 +110,19 @@ impl Mode {
                 Key::Char('x') => {
                     editor.delete_cur_char();
                     Mode::Normal
+                },
+                Key::Char('s') => {
+                    editor.delete_cur_char();
+                    editor.set_cursor_style(crate::CursorStyle::Bar);
+                    editor.action_stack.add_action(Action::Insert, editor.cur_line, editor.cur_pos);
+                    Mode::Insert
+                },
+                Key::Char('S') => {
+                    editor.delete_cur_line();
+                    editor.set_cursor_style(crate::CursorStyle::Bar);
+                    editor.new_line_ahead();
+                    editor.action_stack.add_action(Action::Insert, editor.cur_line, editor.cur_pos);
+                    Mode::Insert
                 },
                 Key::Char(' ') => {
                     editor.forward_to_next_char();
@@ -223,9 +236,7 @@ impl Mode {
                 Mode::Insert
             },
             Key::Esc => {
-                if editor.cursor_at_end_of_line() {
-                    editor.dec_x()
-                }
+                editor.dec_x();
                 editor.set_cursor_style(crate::CursorStyle::Block);
                 Mode::Normal
             },
@@ -397,6 +408,25 @@ mod tests {
         ];
         handle_keys(&mut editor, keys);
         assert_eq!(editor.text.line_at(0), "eo");
+        assert_eq!(editor.text.line_at(1), "");
+
+        let keys = vec![
+            Key::Char('s'),
+            Key::Char('a'),
+            Key::Esc,
+        ];
+        handle_keys(&mut editor, keys);
+        assert_eq!(editor.text.line_at(0), "ao");
+        assert_eq!(editor.text.line_at(1), "");
+
+        let keys = vec![
+            Key::Char('S'),
+            Key::Char('a'),
+            Key::Char('a'),
+            Key::Esc,
+        ];
+        handle_keys(&mut editor, keys);
+        assert_eq!(editor.text.line_at(0), "aa");
         assert_eq!(editor.text.line_at(1), "");
 
 
