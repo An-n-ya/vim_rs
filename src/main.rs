@@ -217,6 +217,10 @@ impl TextEditor {
                 Mode::handle_normal(self, key);
             }
             self.task.clear();
+        } else if self.task.last_two_task() == Some("dd".to_string()) {
+            // FIXME: considering `2dd`
+            self.delete_cur_line();
+            self.task.clear();
         }
         self.processing_task = false;
     }

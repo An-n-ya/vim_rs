@@ -18,6 +18,19 @@ impl Task {
     pub fn len(&self) -> usize {
         self.tasks.len()
     }
+    pub fn last_two_task(&self) -> Option<String> {
+        if self.len() < 2 {
+            return None;
+        }
+        let mut s = "".to_string();
+        if let Key::Char(c) = self.tasks[self.len() - 1] {
+            s.push(c);
+        }
+        if let Key::Char(c) = self.tasks[self.len() - 2] {
+            s.push(c);
+        }
+        Some(s)
+    }
     pub fn last_task(&self) -> Option<&Key> {
         self.tasks.last()
     }
