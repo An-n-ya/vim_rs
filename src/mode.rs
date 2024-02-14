@@ -36,7 +36,69 @@ impl Mode {
         }
     }
 
+    fn pre_handle_normal(editor: &mut TextEditor, key: Key) -> bool {
+        match key {
+            Key::Char(c @ '0'..='9') => {
+                if c == '0' {
+                    if editor.task.has_num() {
+                        editor.task.push(key);
+                    } else {
+                        return false;
+                    }
+                } else {
+                    editor.task.push(key);
+                }
+            },
+            Key::Char('j')
+            | Key::Char('k')
+            | Key::Char('h')
+            | Key::Char('l')
+            | Key::Char('e')
+            | Key::Char('w')
+            | Key::Char('b')
+            | Key::Char(' ')
+            | Key::Backspace
+            | Key::Left
+            | Key::Right
+            | Key::Down
+            | Key::Up
+            => {
+                if editor.task.has_num() {
+                    editor.task.push(key)
+                } else {
+                    return false;
+                }
+            },
+            Key::Char('i')
+            | Key::Char('a')
+            => {
+                if editor.task.len() > 0 {
+                    editor.task.push(key);
+                } else {
+                    return false;
+                }
+            },
+            Key::Char('c')
+            | Key::Char('d')
+            | Key::Char('y')
+            => {
+                editor.task.push(key)
+            },
+            _ => {
+                return false;
+            }
+        }
+
+        editor.try_perform_task();
+        true
+    }
+
     pub fn handle_normal(editor: &mut TextEditor, key: Key) -> Self {
+        if !editor.processing_task {
+            if Self::pre_handle_normal(editor, key) {
+                return Mode::Normal;
+            }
+        }
         match key {
                 Key::Ctrl('q') => {
                     Mode::Exit
@@ -167,6 +229,7 @@ impl Mode {
                 _ => Mode::Normal
         }
     }
+
 
     fn handle_visual(editor: &mut TextEditor, key: Key) -> Self {
         match key {
@@ -520,5 +583,27 @@ mod tests {
         ];
         handle_keys(&mut editor, keys);
         assert_eq!(editor.text.line_at(1), "lo");
+    }
+
+    #[test]
+    fn task_test() {
+        let mut editor = init(vec!["hello".to_string(), "world".to_string()]);
+
+        let keys = vec![
+            Key::Char('2'),
+            Key::Char('l'),
+            Key::Esc,
+        ];
+        handle_keys(&mut editor, keys);
+        assert_eq!(editor.cur_char(), 'l');
+
+        let keys = vec![
+            Key::Char('2'),
+            Key::Char('0'),
+            Key::Char('j'),
+            Key::Esc,
+        ];
+        handle_keys(&mut editor, keys);
+        assert_eq!(editor.cur_char(), 'r');
     }
 }

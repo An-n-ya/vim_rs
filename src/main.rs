@@ -37,6 +37,7 @@ struct TextEditor {
     task: Task,
     action_stack: ActionStack,
     processing_action: bool,
+    processing_task: bool,
 }
 
 struct TextView {
@@ -107,7 +108,8 @@ impl TextEditor {
             mode: Mode::Normal,
             task: Task::default(),
             action_stack: ActionStack::default(),
-            processing_action: false
+            processing_action: false,
+            processing_task: false,
         }
     }
 
@@ -137,7 +139,8 @@ impl TextEditor {
             mode: Mode::Normal,
             task: Task::default(),
             action_stack: ActionStack::default(),
-            processing_action: false
+            processing_action: false,
+            processing_task: false,
         }
 
     }
@@ -168,7 +171,7 @@ impl TextEditor {
 
     fn show_bar(&mut self) {
         write!(self.out, "{}",termion::cursor::Goto(0, (self.terminal_size.1) as u16)).unwrap();
-        write!(self.out, "{}{} line-count={} filename: {}, size: ({}, {}) line[{}-{}] pos[{}:{}] mode:{}{}",
+        write!(self.out, "{}{} line-count={} filename: {}, size: ({}, {}) line[{}-{}] pos[{}:{}] mode:{} task:{}{}",
                     color::Fg(color::Blue),
                     style::Bold,
                     self.text_length(),
@@ -180,6 +183,7 @@ impl TextEditor {
                     self.cur_pos.x,
                     self.cur_pos.y,
                     self.mode,
+                    self.task,
                     style::Reset
                 ).unwrap();
     }
@@ -200,6 +204,21 @@ impl TextEditor {
 
     fn update_pos(&mut self) {
         write!(self.out, "{}", termion::cursor::Goto(self.cur_pos.x as u16, self.cur_pos.y as u16)).unwrap();
+    }
+
+    pub fn try_perform_task(&mut self) {
+        self.processing_task = true;
+        if self.task.is_movement() {
+            // it is guaranteed that current tasks have num
+            assert!(self.task.has_num());
+            let n = self.task.num().unwrap();
+            let key = *self.task.last_task().unwrap();
+            for _ in 0..n {
+                Mode::handle_normal(self, key);
+            }
+            self.task.clear();
+        }
+        self.processing_task = false;
     }
 
     pub fn revoke_action(&mut self, action: Option<CmdAction>) {
