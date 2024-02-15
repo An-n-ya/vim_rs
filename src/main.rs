@@ -10,7 +10,7 @@ use termion::{color, style, raw::IntoRawMode, input::{TermRead, MouseTerminal}, 
 use text::Text;
 use crate::mode::Mode;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Coordinates {
     pub x: usize,
     pub y: usize
@@ -30,6 +30,7 @@ struct TextEditor {
     cur_pos: Coordinates,
     cur_line: usize,
     view: TextView,
+    select_view: SelectView,
     terminal_size: Size,
     file_name: String,
     out: Box<dyn Write>,
@@ -40,6 +41,26 @@ struct TextEditor {
     processing_task: bool,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum SelectView {
+    CharacterView(CharacterView),
+    LineView(LineView),
+    BlockView(CharacterView),
+    None
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct CharacterView {
+    start: Coordinates,
+    end: Coordinates,
+}
+#[derive(Debug, PartialEq, Eq)]
+struct LineView {
+    start: usize,
+    end: usize,
+}
+
+#[derive(Debug)]
 struct TextView {
     lower_line: usize,
     upper_line: usize,
@@ -102,6 +123,7 @@ impl TextEditor {
             cur_pos: Coordinates{x:1,y:1},
             cur_line: 1,
             view,
+            select_view: SelectView::None,
             terminal_size: Size(size.0, size.1),
             file_name: file_name.into(),
             out,
@@ -133,6 +155,7 @@ impl TextEditor {
             cur_pos: Coordinates{x:1,y:1},
             cur_line: 1,
             view,
+            select_view: SelectView::None,
             terminal_size: Size(size.0, size.1),
             file_name: "test_file".into(),
             out,
@@ -161,7 +184,85 @@ impl TextEditor {
     fn print_text(&mut self) {
         write!(self.out, "{}{}", termion::clear::All, termion::cursor::Goto(1,1)).unwrap();
         for line in self.view.lower_line()..self.view.upper_line() {
-            writeln!(self.out, "{}\r", self.text.line_at(line as usize)).unwrap();
+            let text = self.text.line_at(line as usize);
+            for (col, c) in text.chars().enumerate() {
+                if self.is_select_start(col, line) {
+                    write!(self.out, "{}", termion::style::Invert).unwrap();
+                }
+                write!(self.out, "{}", c).unwrap();
+                if self.is_select_end(col, line) {
+                    write!(self.out, "{}", termion::style::NoInvert).unwrap();
+                }
+            }
+            writeln!(self.out, "\r").unwrap();
+        }
+    }
+
+    fn is_select_end(&mut self, line: usize, col: usize) -> bool {
+        match Self::sort_select_view(&self.select_view) {
+            SelectView::CharacterView(v) => {
+                line == v.end.x && col == v.end.y
+            },
+            SelectView::LineView(v) => {
+                line == v.end
+            },
+            SelectView::BlockView(v) => {
+                line <= v.end.x && col == v.end.y
+            },
+            SelectView::None => false,
+        }
+    }
+    fn is_select_start(&mut self, line: usize, col: usize) -> bool {
+        match Self::sort_select_view(&self.select_view) {
+            SelectView::CharacterView(v) => {
+                line == v.start.x && col == v.start.y
+            },
+            SelectView::LineView(v) => {
+                line == v.start
+            },
+            SelectView::BlockView(v) => {
+                line >= v.start.x && col == v.start.y
+            },
+            SelectView::None => false,
+        }
+    }
+
+    fn sort_select_view(mode: &SelectView) -> SelectView {
+        match mode {
+            SelectView::CharacterView(v) => {
+                let mut start = v.start;
+                let mut end = v.end;
+                if end.y < start.y || start.y == end.y && end.x < start.x {
+                    (start, end) = (end, start);
+                }
+                SelectView::CharacterView(CharacterView{start, end})
+            },
+            SelectView::LineView(_) => todo!(),
+            SelectView::BlockView(_) => todo!(),
+            SelectView::None => SelectView::None,
+        }
+    }
+
+    pub fn set_visual_mode(&mut self, mode: SelectView) {
+        self.select_view = mode;
+    }
+
+    pub fn update_visual_pos(&mut self) {
+        if self.mode != Mode::Visual {
+            return;
+        }
+        match &self.select_view {
+            SelectView::CharacterView(v) => {
+                let mut end = self.cur_pos;
+                end = Coordinates{x: end.x - 1, y: end.y - 1};
+                let start = v.start;
+
+
+                self.select_view = SelectView::CharacterView(CharacterView{start, end});
+            },
+            SelectView::LineView(_) => todo!(),
+            SelectView::BlockView(_) => todo!(),
+            SelectView::None => return,
         }
     }
 
@@ -171,7 +272,7 @@ impl TextEditor {
 
     fn show_bar(&mut self) {
         write!(self.out, "{}",termion::cursor::Goto(0, (self.terminal_size.1) as u16)).unwrap();
-        write!(self.out, "{}{} line-count={} filename: {}, size: ({}, {}) line[{}-{}] pos[{}:{}] mode:{} task:{}{}",
+        write!(self.out, "{}{} line-count={} filename: {}, size: ({}, {}) line[{}-{}] pos[{}:{}] mode:{} task:{} {}",
                     color::Fg(color::Blue),
                     style::Bold,
                     self.text_length(),
@@ -196,6 +297,7 @@ impl TextEditor {
 
     fn set_cursor_style(&mut self, style: CursorStyle) {
         match style {
+            // FIXME: cursor is not blinking
             CursorStyle::Bar => write!(self.out, "{}", termion::cursor::BlinkingBar),
             CursorStyle::Block => write!(self.out, "{}", termion::cursor::BlinkingBlock),
             CursorStyle::Underline => write!(self.out, "{}", termion::cursor::BlinkingUnderline),
@@ -290,7 +392,7 @@ impl TextEditor {
 
     fn len_of_cur_line(&self) -> usize {
         assert!(self.cur_line != 0);
-        if self.mode == Mode::Normal {
+        if self.mode == Mode::Normal || self.mode == Mode::Visual || self.mode == Mode::Command {
             1.max(self.text.len_of_line_at(self.cur_line - 1))
         } else if self.mode == Mode::Insert {
             1.max(self.text.len_of_line_at(self.cur_line - 1) + 1)

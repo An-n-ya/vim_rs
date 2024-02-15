@@ -1,6 +1,6 @@
 use termion::event::Key;
 
-use crate::{command::Action, TextEditor};
+use crate::{command::Action, CharacterView, Coordinates, SelectView, TextEditor};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Mode {
@@ -224,6 +224,14 @@ impl Mode {
                     Mode::Command
                 },
                 Key::Char('v') => {
+                    let mut pos = editor.cur_pos;
+                    pos = Coordinates{x: pos.x - 1, y: pos.y - 1};
+                    if cfg!(test) {
+                        println!("entering character visual mode, pos={:?}", pos);
+                    }
+
+                    let mode = SelectView::CharacterView(CharacterView{start:pos, end:pos});
+                    editor.set_visual_mode(mode);
                     Mode::Visual
                 },
                 _ => Mode::Normal
@@ -232,16 +240,36 @@ impl Mode {
 
 
     fn handle_visual(editor: &mut TextEditor, key: Key) -> Self {
-        match key {
+        let mode = match key {
             Key::Esc => {
                 editor.set_cursor_style(crate::CursorStyle::Block);
-                Mode::Normal
+                editor.set_visual_mode(SelectView::None);
+                return Mode::Normal;
             },
             Key::Ctrl('q') => {
                 Mode::Exit
             },
+            Key::Char('h') | Key::Left => {
+                editor.dec_x();
+                Mode::Visual
+            },
+            Key::Char('j') | Key::Down => {
+                editor.inc_y();
+                Mode::Visual
+            },
+            Key::Char('k') | Key::Up => {
+                editor.dec_y();
+                Mode::Visual
+            },
+            Key::Char('l') | Key::Right => {
+                editor.inc_x();
+                Mode::Visual
+            },
             _ => Mode::Visual
-        }
+        };
+
+        editor.update_visual_pos();
+        mode
     }
     pub fn handle_insert(editor: &mut TextEditor, key: Key) -> Self {
 
@@ -605,5 +633,18 @@ mod tests {
         ];
         handle_keys(&mut editor, keys);
         assert_eq!(editor.cur_char(), 'r');
+    }
+
+    #[test]
+    fn visual_mode_test() {
+        let mut editor = init(vec!["hello".to_string(), "world".to_string()]);
+
+        let keys = vec![
+            Key::Char('v'),
+            Key::Char('l'),
+            Key::Esc,
+        ];
+        handle_keys(&mut editor, keys);
+        // TODO: edit in visual mode test cases needed
     }
 }
