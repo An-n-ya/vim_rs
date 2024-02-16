@@ -198,30 +198,31 @@ impl TextEditor {
         }
     }
 
-    fn is_select_end(&mut self, line: usize, col: usize) -> bool {
+    fn is_select_end(&mut self, col: usize, line: usize) -> bool {
         match Self::sort_select_view(&self.select_view) {
             SelectView::CharacterView(v) => {
-                line == v.end.x && col == v.end.y
+                line > v.end.y || col >= v.end.x && line == v.end.y
             },
             SelectView::LineView(v) => {
-                line == v.end
+                col >= v.end
             },
             SelectView::BlockView(v) => {
-                line <= v.end.x && col == v.end.y
+                col == v.end.x && line <= v.end.y
             },
             SelectView::None => false,
         }
     }
-    fn is_select_start(&mut self, line: usize, col: usize) -> bool {
+    fn is_select_start(&mut self, col: usize, line: usize) -> bool {
         match Self::sort_select_view(&self.select_view) {
             SelectView::CharacterView(v) => {
-                line == v.start.x && col == v.start.y
+                (line > v.start.y || col >= v.start.x && line == v.start.y)
+                && (line < v.end.y || line == v.end.y && col <= v.end.x)
             },
             SelectView::LineView(v) => {
-                line == v.start
+                line >= v.start && line <= v.end
             },
             SelectView::BlockView(v) => {
-                line >= v.start.x && col == v.start.y
+                col == v.start.x && line >= v.start.y
             },
             SelectView::None => false,
         }
@@ -237,7 +238,14 @@ impl TextEditor {
                 }
                 SelectView::CharacterView(CharacterView{start, end})
             },
-            SelectView::LineView(_) => todo!(),
+            SelectView::LineView(v) => {
+                let mut start = v.start;
+                let mut end = v.end;
+                if end < start {
+                    (start, end) = (end, start);
+                }
+                SelectView::LineView(LineView{start, end})
+            },
             SelectView::BlockView(_) => todo!(),
             SelectView::None => SelectView::None,
         }
@@ -254,13 +262,16 @@ impl TextEditor {
         match &self.select_view {
             SelectView::CharacterView(v) => {
                 let mut end = self.cur_pos;
-                end = Coordinates{x: end.x - 1, y: end.y - 1};
+                end = Coordinates{x: end.x - 1, y: self.cur_line - 1};
                 let start = v.start;
 
 
                 self.select_view = SelectView::CharacterView(CharacterView{start, end});
             },
-            SelectView::LineView(_) => todo!(),
+            SelectView::LineView(v) => {
+                let start = v.start;
+                self.select_view = SelectView::LineView(LineView{start, end: self.cur_line - 1});
+            },
             SelectView::BlockView(_) => todo!(),
             SelectView::None => return,
         }

@@ -1,6 +1,6 @@
 use termion::event::Key;
 
-use crate::{command::Action, CharacterView, Coordinates, SelectView, TextEditor};
+use crate::{command::Action, CharacterView, Coordinates, LineView, SelectView, TextEditor};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Mode {
@@ -225,7 +225,7 @@ impl Mode {
                 },
                 Key::Char('v') => {
                     let mut pos = editor.cur_pos;
-                    pos = Coordinates{x: pos.x - 1, y: pos.y - 1};
+                    pos = Coordinates{x: pos.x - 1, y: editor.cur_line - 1};
                     if cfg!(test) {
                         println!("entering character visual mode, pos={:?}", pos);
                     }
@@ -233,6 +233,12 @@ impl Mode {
                     let mode = SelectView::CharacterView(CharacterView{start:pos, end:pos});
                     editor.set_visual_mode(mode);
                     Mode::Visual
+                },
+                Key::Char('V') => {
+                    let mode = SelectView::LineView(LineView{start:editor.cur_line - 1, end:editor.cur_line - 1});
+                    editor.set_visual_mode(mode);
+                    Mode::Visual
+
                 },
                 _ => Mode::Normal
         }
