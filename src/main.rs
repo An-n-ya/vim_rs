@@ -45,6 +45,7 @@ struct TextEditor {
 enum SelectView {
     CharacterView(CharacterView),
     LineView(LineView),
+    #[allow(dead_code)]
     BlockView(CharacterView),
     None
 }
@@ -195,6 +196,25 @@ impl TextEditor {
                 }
             }
             writeln!(self.out, "\r").unwrap();
+        }
+    }
+
+    fn delete_selected(&mut self) {
+        match Self::sort_select_view(&self.select_view) {
+            SelectView::CharacterView(v) => {
+                let start = Coordinates{x: v.start.y, y: v.start.x};
+                let end = Coordinates{x: v.end.y, y: v.end.x};
+                self.text.delete_range(start, end);
+                self.set_pos(v.start.x + 1, v.start.y + 1);
+            },
+            SelectView::LineView(v) => {
+                let start = Coordinates{x: v.start, y: 0};
+                let end = Coordinates{x: v.end, y: self.len_of_line_at(v.end) - 1};
+                self.text.delete_range(start, end);
+                self.set_pos(v.start + 1, 1);
+            },
+            SelectView::BlockView(_) => todo!(),
+            SelectView::None => (),
         }
     }
 
@@ -403,19 +423,25 @@ impl TextEditor {
 
     fn len_of_cur_line(&self) -> usize {
         assert!(self.cur_line != 0);
+        self.len_of_line_at(self.cur_line - 1)
+    }
+
+    fn len_of_line_at(&self, line: usize) -> usize {
         if self.mode == Mode::Normal || self.mode == Mode::Visual || self.mode == Mode::Command {
-            1.max(self.text.len_of_line_at(self.cur_line - 1))
+            1.max(self.text.len_of_line_at(line))
         } else if self.mode == Mode::Insert {
-            1.max(self.text.len_of_line_at(self.cur_line - 1) + 1)
+            1.max(self.text.len_of_line_at(line) + 1)
         } else {
             unimplemented!()
         }
+
     }
 
     fn text_length(&self) -> usize {
         self.text.len()
     }
 
+    #[allow(unused)]
     fn cursor_at_end_of_line(&mut self) -> bool {
         self.cur_pos.x == self.len_of_cur_line()
     }

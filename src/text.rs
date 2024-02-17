@@ -1,3 +1,5 @@
+use crate::Coordinates;
+
 pub struct Text {
     lines: Vec<String>
 }
@@ -43,6 +45,29 @@ impl Text {
             return Some(self.lines[x].remove(y));
         }
         None
+    }
+    pub fn delete_range(&mut self, start: Coordinates, end: Coordinates) {
+        let former: String;
+        let latter: String;
+        if start.x == end.x {
+            assert!(start.y <= end.y);
+            let text = self.lines[start.x].clone();
+            former = text[0..start.y].to_string();
+            latter = text[end.y+1..].to_string();
+        } else {
+            assert!(start.x < end.x);
+            for i in (start.x+1..end.x).into_iter().rev() {
+                self.delete_line_at(i);
+            }
+            former = (&self.lines[start.x].clone()[0..start.y]).to_string();
+            latter = (&self.lines[start.x + 1].clone()[end.y+1..]).to_string();
+            self.delete_line_at(start.x+1);
+        }
+        if former.len() == 0 && latter.len() == 0 {
+            self.delete_line_at(start.x);
+        } else {
+            self.lines[start.x] = former + &latter;
+        }
     }
 
     pub fn len_of_line_at(&self, line: usize) -> usize {

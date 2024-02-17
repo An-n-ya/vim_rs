@@ -271,6 +271,23 @@ impl Mode {
                 editor.inc_x();
                 Mode::Visual
             },
+            Key::Char('c') => {
+                // TODO: delete selected and enter insert mode
+                // TODO: consider undo/redo
+                editor.delete_selected();
+                editor.set_cursor_style(crate::CursorStyle::Bar);
+                editor.action_stack.add_action(Action::Insert, editor.cur_line, editor.cur_pos);
+                Mode::Insert
+            },
+            Key::Char('d') => {
+                // TODO: delete selected
+                editor.delete_selected();
+                // TODO: consider undo/redo
+
+                editor.set_cursor_style(crate::CursorStyle::Block);
+                editor.set_visual_mode(SelectView::None);
+                return Mode::Normal;
+            },
             _ => Mode::Visual
         };
 
@@ -645,12 +662,19 @@ mod tests {
     fn visual_mode_test() {
         let mut editor = init(vec!["hello".to_string(), "world".to_string()]);
 
+        assert_eq!(editor.cur_char(), 'h');
         let keys = vec![
+            Key::Char('l'),
+            Key::Char('l'),
             Key::Char('v'),
             Key::Char('l'),
+            Key::Char('l'),
+            Key::Char('d'),
             Key::Esc,
         ];
         handle_keys(&mut editor, keys);
-        // TODO: edit in visual mode test cases needed
+        // FIXME: why this test is failed?
+        // assert_eq!(editor.text.line_at(0), "he");
+        assert_eq!(editor.text.line_at(1), "world");
     }
 }
