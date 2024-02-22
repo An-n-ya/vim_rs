@@ -1,26 +1,37 @@
-mod mode;
-mod text;
 mod command;
+mod mode;
 mod task;
+mod text;
 
-use std::{env::args, fs, io::{stdout, stdin, Write, BufWriter}};
-use command::{Action, ActionStack, CmdAction};
-use task::Task;
-use termion::{color, style, raw::IntoRawMode, input::{TermRead, MouseTerminal}, event::Key, screen::AlternateScreen};
-use text::Text;
 use crate::mode::Mode;
+use command::{Action, ActionStack, CmdAction};
+use std::{
+    env::args,
+    fs,
+    io::{stderr, stdin, stdout, BufWriter, Write},
+};
+use task::Task;
+use termion::{
+    color,
+    event::Key,
+    input::{MouseTerminal, TermRead},
+    raw::IntoRawMode,
+    screen::AlternateScreen,
+    style,
+};
+use text::Text;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Coordinates {
     pub x: usize,
-    pub y: usize
+    pub y: usize,
 }
 
 #[allow(dead_code)]
 enum CursorStyle {
     Bar,
     Block,
-    Underline
+    Underline,
 }
 
 struct Size(u16, u16);
@@ -47,7 +58,7 @@ enum SelectView {
     LineView(LineView),
     #[allow(dead_code)]
     BlockView(CharacterView),
-    None
+    None,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -74,7 +85,7 @@ impl TextView {
     }
     pub fn move_up(&mut self, n: usize) {
         if self.upper_line == 0 {
-            return
+            return;
         }
         if n > self.lower_line {
             self.upper_line -= self.lower_line;
@@ -84,10 +95,10 @@ impl TextView {
             self.lower_line -= n;
         }
     }
-    pub fn upper_line(&self) -> usize{
+    pub fn upper_line(&self) -> usize {
         self.upper_line
     }
-    pub fn lower_line(&self) -> usize{
+    pub fn lower_line(&self) -> usize {
         self.lower_line
     }
     pub fn shrink_upper(&mut self) {
@@ -100,7 +111,6 @@ impl TextView {
     }
 }
 
-
 impl TextEditor {
     pub fn new(file_name: &str) -> Self {
         let mut text = Text::new();
@@ -110,18 +120,21 @@ impl TextEditor {
         }
         let text_length = file_handle.lines().count();
         let size = termion::terminal_size().unwrap();
-        let view = TextView{lower_line: 0, upper_line: text_length.min(size.1 as usize - 1)};
+        let view = TextView {
+            lower_line: 0,
+            upper_line: text_length.min(size.1 as usize - 1),
+        };
         let mut out = MouseTerminal::from(AlternateScreen::from(BufWriter::with_capacity(
-                1 << 14,
-                stdout(),
-            )))
-            .into_raw_mode()
-            .unwrap();
+            1 << 14,
+            stdout(),
+        )))
+        .into_raw_mode()
+        .unwrap();
         write!(out, "{}", termion::cursor::Show).unwrap();
         let out = Box::new(out);
         TextEditor {
             text,
-            cur_pos: Coordinates{x:1,y:1},
+            cur_pos: Coordinates { x: 1, y: 1 },
             cur_line: 1,
             view,
             select_view: SelectView::None,
@@ -144,16 +157,16 @@ impl TextEditor {
         }
         let text_length = lines.len();
         let size = termion::terminal_size().unwrap();
-        let view = TextView{lower_line: 0, upper_line: text_length.min(size.1 as usize - 1)};
-        let mut out = BufWriter::with_capacity(
-                1 << 14,
-                vec![],
-            );
+        let view = TextView {
+            lower_line: 0,
+            upper_line: text_length.min(size.1 as usize - 1),
+        };
+        let mut out = BufWriter::with_capacity(1 << 14, vec![]);
         write!(out, "{}", termion::cursor::Show).unwrap();
         let out = Box::new(out);
         TextEditor {
             text,
-            cur_pos: Coordinates{x:1,y:1},
+            cur_pos: Coordinates { x: 1, y: 1 },
             cur_line: 1,
             view,
             select_view: SelectView::None,
@@ -166,7 +179,6 @@ impl TextEditor {
             processing_action: false,
             processing_task: false,
         }
-
     }
 
     fn flush(&mut self) {
@@ -183,7 +195,13 @@ impl TextEditor {
     }
 
     fn print_text(&mut self) {
-        write!(self.out, "{}{}", termion::clear::All, termion::cursor::Goto(1,1)).unwrap();
+        write!(
+            self.out,
+            "{}{}",
+            termion::clear::All,
+            termion::cursor::Goto(1, 1)
+        )
+        .unwrap();
         for line in self.view.lower_line()..self.view.upper_line() {
             let text = self.text.line_at(line as usize);
             for (col, c) in text.chars().enumerate() {
@@ -200,35 +218,52 @@ impl TextEditor {
     }
 
     fn delete_selected(&mut self) {
-        match Self::sort_select_view(&self.select_view) {
+        let contents = match Self::sort_select_view(&self.select_view) {
             SelectView::CharacterView(v) => {
-                let start = Coordinates{x: v.start.y, y: v.start.x};
-                let end = Coordinates{x: v.end.y, y: v.end.x};
-                self.text.delete_range(start, end);
+                let start = Coordinates {
+                    x: v.start.y,
+                    y: v.start.x,
+                };
+                let end = Coordinates {
+                    x: v.end.y,
+                    y: v.end.x,
+                };
                 self.set_pos(v.start.x + 1, v.start.y + 1);
-            },
+                self.set_cur_line(v.start.y + 1);
+                self.text.delete_range(start, end)
+            }
             SelectView::LineView(v) => {
-                let start = Coordinates{x: v.start, y: 0};
-                let end = Coordinates{x: v.end, y: self.len_of_line_at(v.end) - 1};
-                self.text.delete_range(start, end);
-                self.set_pos(v.start + 1, 1);
-            },
+                let start = Coordinates { x: v.start, y: 0 };
+                let end = Coordinates {
+                    x: v.end,
+                    y: self.len_of_line_at(v.end) - 1,
+                };
+                self.set_pos(1, v.start + 1);
+                self.set_cur_line(v.start + 1);
+                self.text.delete_range(start, end)
+            }
             SelectView::BlockView(_) => todo!(),
-            SelectView::None => (),
+            SelectView::None => "".to_string(),
+        };
+        if !contents.is_empty() {
+            self.action_stack
+                .add_action(Action::Delete, self.cur_line, self.cur_pos);
+            write!(
+                stderr(),
+                "add action delete at ({},{:?})\n",
+                self.cur_line,
+                self.cur_pos
+            )
+            .unwrap();
+            self.action_stack.append_string_to_top(contents);
         }
     }
 
     fn is_select_end(&mut self, col: usize, line: usize) -> bool {
         match Self::sort_select_view(&self.select_view) {
-            SelectView::CharacterView(v) => {
-                line > v.end.y || col >= v.end.x && line == v.end.y
-            },
-            SelectView::LineView(v) => {
-                col >= v.end
-            },
-            SelectView::BlockView(v) => {
-                col == v.end.x && line <= v.end.y
-            },
+            SelectView::CharacterView(v) => line > v.end.y || col >= v.end.x && line == v.end.y,
+            SelectView::LineView(v) => col >= v.end,
+            SelectView::BlockView(v) => col == v.end.x && line <= v.end.y,
             SelectView::None => false,
         }
     }
@@ -236,14 +271,10 @@ impl TextEditor {
         match Self::sort_select_view(&self.select_view) {
             SelectView::CharacterView(v) => {
                 (line > v.start.y || col >= v.start.x && line == v.start.y)
-                && (line < v.end.y || line == v.end.y && col <= v.end.x)
-            },
-            SelectView::LineView(v) => {
-                line >= v.start && line <= v.end
-            },
-            SelectView::BlockView(v) => {
-                col == v.start.x && line >= v.start.y
-            },
+                    && (line < v.end.y || line == v.end.y && col <= v.end.x)
+            }
+            SelectView::LineView(v) => line >= v.start && line <= v.end,
+            SelectView::BlockView(v) => col == v.start.x && line >= v.start.y,
             SelectView::None => false,
         }
     }
@@ -256,16 +287,16 @@ impl TextEditor {
                 if end.y < start.y || start.y == end.y && end.x < start.x {
                     (start, end) = (end, start);
                 }
-                SelectView::CharacterView(CharacterView{start, end})
-            },
+                SelectView::CharacterView(CharacterView { start, end })
+            }
             SelectView::LineView(v) => {
                 let mut start = v.start;
                 let mut end = v.end;
                 if end < start {
                     (start, end) = (end, start);
                 }
-                SelectView::LineView(LineView{start, end})
-            },
+                SelectView::LineView(LineView { start, end })
+            }
             SelectView::BlockView(_) => todo!(),
             SelectView::None => SelectView::None,
         }
@@ -282,16 +313,21 @@ impl TextEditor {
         match &self.select_view {
             SelectView::CharacterView(v) => {
                 let mut end = self.cur_pos;
-                end = Coordinates{x: end.x - 1, y: self.cur_line - 1};
+                end = Coordinates {
+                    x: end.x - 1,
+                    y: self.cur_line - 1,
+                };
                 let start = v.start;
 
-
-                self.select_view = SelectView::CharacterView(CharacterView{start, end});
-            },
+                self.select_view = SelectView::CharacterView(CharacterView { start, end });
+            }
             SelectView::LineView(v) => {
                 let start = v.start;
-                self.select_view = SelectView::LineView(LineView{start, end: self.cur_line - 1});
-            },
+                self.select_view = SelectView::LineView(LineView {
+                    start,
+                    end: self.cur_line - 1,
+                });
+            }
             SelectView::BlockView(_) => todo!(),
             SelectView::None => return,
         }
@@ -302,7 +338,12 @@ impl TextEditor {
     }
 
     fn show_bar(&mut self) {
-        write!(self.out, "{}",termion::cursor::Goto(0, (self.terminal_size.1) as u16)).unwrap();
+        write!(
+            self.out,
+            "{}",
+            termion::cursor::Goto(0, (self.terminal_size.1) as u16)
+        )
+        .unwrap();
         write!(self.out, "{}{} line-count={} filename: {}, size: ({}, {}) line[{}-{}] pos[{}:{}] mode:{} task:{} {}",
                     color::Fg(color::Blue),
                     style::Bold,
@@ -325,6 +366,9 @@ impl TextEditor {
         self.cur_pos.y = y;
         self.update_pos();
     }
+    fn set_cur_line(&mut self, line: usize) {
+        self.cur_line = line;
+    }
 
     fn set_cursor_style(&mut self, style: CursorStyle) {
         match style {
@@ -332,11 +376,17 @@ impl TextEditor {
             CursorStyle::Bar => write!(self.out, "{}", termion::cursor::BlinkingBar),
             CursorStyle::Block => write!(self.out, "{}", termion::cursor::BlinkingBlock),
             CursorStyle::Underline => write!(self.out, "{}", termion::cursor::BlinkingUnderline),
-        }.unwrap();
+        }
+        .unwrap();
     }
 
     fn update_pos(&mut self) {
-        write!(self.out, "{}", termion::cursor::Goto(self.cur_pos.x as u16, self.cur_pos.y as u16)).unwrap();
+        write!(
+            self.out,
+            "{}",
+            termion::cursor::Goto(self.cur_pos.x as u16, self.cur_pos.y as u16)
+        )
+        .unwrap();
     }
 
     pub fn try_perform_task(&mut self) {
@@ -367,32 +417,26 @@ impl TextEditor {
             self.set_pos(pos.x, pos.y);
             self.cur_line = cur_line;
             match action.action {
-                Action::Delete => {
-                    action.contents.iter().for_each(|&a| {
-                        match a {
-                            Key::Char(c) => self.insert_char_at_cur(c),
-                            _ => unreachable!()
-                        }
-                    })
-                },
-                Action::Insert => {
-                    action.contents.iter().for_each(|&a| {
-                        if a == Key::Char('\t') {
-                            for _ in 0..4 {
-                                self.delete_cur_char();
-                            }
-                        } else {
+                Action::Delete => action.contents.iter().for_each(|&a| match a {
+                    Key::Char(c) => self.append_char_at_cur(c),
+                    _ => unreachable!(),
+                }),
+                Action::Insert => action.contents.iter().for_each(|&a| {
+                    if a == Key::Char('\t') {
+                        for _ in 0..4 {
                             self.delete_cur_char();
                         }
-                    })
-                }
+                    } else {
+                        self.delete_cur_char();
+                    }
+                }),
             }
         }
 
         self.processing_action = false;
     }
 
-    pub fn restore_action(&mut self, action: Option<CmdAction>)  {
+    pub fn restore_action(&mut self, action: Option<CmdAction>) {
         self.processing_action = true;
         if let Some(action) = action {
             let pos = action.pos;
@@ -400,25 +444,21 @@ impl TextEditor {
             self.set_pos(pos.x, pos.y);
             self.cur_line = cur_line;
             match action.action {
-                Action::Insert => {
-                    action.contents.iter().for_each(|&a| {
-                        if cfg!(test) {
-                            println!("restoring insert key:{:?}", a);
-                        }
-                        Mode::handle_insert(self, a);
-                    })
-                },
+                Action::Insert => action.contents.iter().for_each(|&a| {
+                    if cfg!(test) {
+                        println!("restoring insert key:{:?}", a);
+                    }
+                    Mode::handle_insert(self, a);
+                }),
                 Action::Delete => {
                     action.contents.iter().for_each(|&_a| {
                         // consider restoring `dd`
                         Mode::handle_normal(self, Key::Char('x'));
                     })
-
-                },
+                }
             }
         }
         self.processing_action = false;
-
     }
 
     fn len_of_cur_line(&self) -> usize {
@@ -434,7 +474,6 @@ impl TextEditor {
         } else {
             unimplemented!()
         }
-
     }
 
     fn text_length(&self) -> usize {
@@ -457,7 +496,7 @@ impl TextEditor {
             if Self::is_blank(self.cur_char()) {
                 self.cur_pos.x += 1;
             } else {
-                return
+                return;
             }
         }
     }
@@ -488,7 +527,6 @@ impl TextEditor {
             self.cur_pos.y -= 1;
         } else {
             self.view.move_up(1);
-
         }
         if self.cur_line > 1 {
             self.cur_line -= 1;
@@ -514,7 +552,7 @@ impl TextEditor {
             if !self.backward_to_next_char() {
                 return;
             }
-            if  self.cur_line != old_line {
+            if self.cur_line != old_line {
                 break;
             }
         }
@@ -582,8 +620,8 @@ impl TextEditor {
         }
     }
     fn forward_to_next_char(&mut self) -> bool {
-        if self.cur_pos.x == self.len_of_cur_line(){
-            if self.cur_line < self.text_length()  {
+        if self.cur_pos.x == self.len_of_cur_line() {
+            if self.cur_line < self.text_length() {
                 // move to the start of next line
                 if self.cur_pos.y < self.max_y().into() {
                     self.cur_pos.y += 1;
@@ -605,14 +643,16 @@ impl TextEditor {
         }
     }
     fn new_line_ahead(&mut self) {
-        self.text.add_line_before(self.cur_pos.y - 1, "".to_string());
+        self.text
+            .add_line_before(self.cur_pos.y - 1, "".to_string());
         self.move_to_start_of_line();
         if self.text_length() < self.terminal_size.1 as usize - 1 {
             self.view.expand_upper();
         }
     }
     fn new_line_behind(&mut self) {
-        self.text.new_line_at(self.cur_pos.y - 1, self.len_of_cur_line());
+        self.text
+            .new_line_at(self.cur_pos.y - 1, self.len_of_cur_line());
         self.inc_y();
         self.move_to_start_of_line();
         if self.text_length() < self.terminal_size.1 as usize - 1 {
@@ -620,7 +660,8 @@ impl TextEditor {
         }
     }
     fn new_line(&mut self) {
-        self.text.new_line_at(self.cur_pos.y - 1, self.cur_pos.x - 1);
+        self.text
+            .new_line_at(self.cur_pos.y - 1, self.cur_pos.x - 1);
         self.inc_y();
         self.move_to_start_of_line();
         if self.text_length() < self.terminal_size.1 as usize - 1 {
@@ -658,7 +699,8 @@ impl TextEditor {
         if self.cur_char() == 0 as char {
             if self.cur_line < self.text_length() {
                 let contents = self.delete_line_at(self.cur_line);
-                self.text.append_str_at(self.cur_line - 1, self.len_of_cur_line(), contents);
+                self.text
+                    .append_str_at(self.cur_line - 1, self.len_of_cur_line(), contents);
             }
             None
         } else {
@@ -666,8 +708,23 @@ impl TextEditor {
         }
     }
 
+    fn append_char_at_cur(&mut self, c: char) {
+        write!(stderr(), "append {c}\n").unwrap();
+        if c == '\n' {
+            self.new_line();
+        } else {
+            self.insert_char_at(c, self.cur_line - 1, self.cur_pos.x - 1);
+            self.inc_x();
+        }
+    }
+    #[allow(dead_code)]
     fn insert_char_at_cur(&mut self, c: char) {
-        self.insert_char_at(c, self.cur_line - 1, self.cur_pos.x - 1);
+        if c == '\n' {
+            self.new_line();
+            self.dec_y();
+        } else {
+            self.insert_char_at(c, self.cur_line - 1, self.cur_pos.x - 1);
+        }
     }
 
     fn insert_char_at(&mut self, c: char, x: usize, y: usize) {
@@ -692,11 +749,8 @@ impl TextEditor {
     }
 }
 
-
-
-
 fn main() {
-let args: Vec<String> = args().collect();
+    let args: Vec<String> = args().collect();
     if args.len() < 2 {
         println!("Please provide file name as arguments");
         std::process::exit(0);
@@ -710,7 +764,3 @@ let args: Vec<String> = args().collect();
     let mut editor = TextEditor::new(&args[1]);
     editor.run();
 }
-
-
-
-

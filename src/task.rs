@@ -2,17 +2,26 @@ use termion::event::Key;
 
 #[derive(Default)]
 pub struct Task {
-    tasks: Vec<Key>
+    tasks: Vec<Key>,
 }
 
 impl Task {
     const MOVEMENT: [Key; 13] = [
-        Key::Char('j'),Key::Char('k'),Key::Char('h'),Key::Char('l'),
-        Key::Char('e'),Key::Char('w'),Key::Char('b'),
-        Key::Char(' '),Key::Backspace,
-        Key::Left,Key::Right,Key::Down,Key::Up,
-        ];
-    pub fn push(&mut self, key: Key)  {
+        Key::Char('j'),
+        Key::Char('k'),
+        Key::Char('h'),
+        Key::Char('l'),
+        Key::Char('e'),
+        Key::Char('w'),
+        Key::Char('b'),
+        Key::Char(' '),
+        Key::Backspace,
+        Key::Left,
+        Key::Right,
+        Key::Down,
+        Key::Up,
+    ];
+    pub fn push(&mut self, key: Key) {
         self.tasks.push(key);
     }
     pub fn len(&self) -> usize {
@@ -65,17 +74,18 @@ impl Task {
         false
     }
 
-    fn iter<F>(&self, mut f: F) where F: FnMut(char) -> () {
-
+    fn iter<F>(&self, mut f: F)
+    where
+        F: FnMut(char) -> (),
+    {
         for task in &self.tasks {
             match task {
                 Key::Char(c) => {
                     f(*c);
-                },
+                }
                 _ => {}
             };
         }
-
     }
 }
 

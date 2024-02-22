@@ -1,18 +1,16 @@
 use crate::Coordinates;
 
 pub struct Text {
-    lines: Vec<String>
+    lines: Vec<String>,
 }
 
 impl Text {
     pub fn new() -> Self {
-        Self {
-            lines: vec![]
-        }
+        Self { lines: vec![] }
     }
     pub fn char_at(&mut self, x: usize, y: usize) -> char {
         if x >= self.lines.len() || self.lines[x].len() == 0 || y >= self.lines[x].len() {
-            return 0 as char
+            return 0 as char;
         }
         self.lines[x].chars().nth(y).unwrap()
     }
@@ -46,28 +44,36 @@ impl Text {
         }
         None
     }
-    pub fn delete_range(&mut self, start: Coordinates, end: Coordinates) {
+    pub fn delete_range(&mut self, start: Coordinates, end: Coordinates) -> String {
         let former: String;
         let latter: String;
+        let mut deleted: String = String::new();
         if start.x == end.x {
             assert!(start.y <= end.y);
             let text = self.lines[start.x].clone();
             former = text[0..start.y].to_string();
-            latter = text[end.y+1..].to_string();
+            latter = text[end.y + 1..].to_string();
+            deleted = text[start.y..end.y + 1].to_string();
         } else {
             assert!(start.x < end.x);
-            for i in (start.x+1..end.x).into_iter().rev() {
-                self.delete_line_at(i);
+            for i in (start.x + 1..end.x).into_iter().rev() {
+                deleted.push_str(&self.delete_line_at(i));
+                deleted.push('\n');
             }
             former = (&self.lines[start.x].clone()[0..start.y]).to_string();
-            latter = (&self.lines[start.x + 1].clone()[end.y+1..]).to_string();
-            self.delete_line_at(start.x+1);
+            latter = (&self.lines[start.x + 1].clone()[end.y + 1..]).to_string();
+            deleted.push_str(&self.lines[start.x][start.y..]);
+            deleted.push('\n');
+            deleted.push_str(&self.lines[start.x + 1][..end.y + 1]);
+            self.delete_line_at(start.x + 1);
         }
         if former.len() == 0 && latter.len() == 0 {
             self.delete_line_at(start.x);
+            deleted.push('\n');
         } else {
             self.lines[start.x] = former + &latter;
         }
+        deleted
     }
 
     pub fn len_of_line_at(&self, line: usize) -> usize {
@@ -107,7 +113,7 @@ mod tests {
     #[test]
     fn insert_basic() {
         let lines = vec!["hello".to_string(), "world".to_string()];
-        let mut text = Text{lines};
+        let mut text = Text { lines };
         for (i, c) in "Annya ".chars().enumerate() {
             text.insert_at(0, i, c);
         }
@@ -125,13 +131,12 @@ mod tests {
         text.delete_line_at(1);
         assert_eq!(text.len(), 1);
         assert_eq!(text.char_at(1, 0), 0 as char);
-
     }
 
     #[test]
     fn new_line() {
         let lines = vec!["hello".to_string(), "world".to_string()];
-        let mut text = Text{lines};
+        let mut text = Text { lines };
         text.new_line_at(1, 2);
         assert_eq!(text.line_at(1), "wo");
         assert_eq!(text.line_at(2), "rld");

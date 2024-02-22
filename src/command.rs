@@ -7,13 +7,13 @@ pub struct CmdAction {
     pub action: Action,
     pub pos: Coordinates,
     pub cur_line: usize,
-    pub contents: Vec<Key>
+    pub contents: Vec<Key>,
 }
 
 #[derive(Clone)]
 pub enum Action {
     Insert,
-    Delete
+    Delete,
 }
 
 #[derive(Default)]
@@ -53,14 +53,18 @@ impl ActionStack {
         let idx = self.backward_stack.len() - 1;
         self.backward_stack[idx].contents.push(key)
     }
+    pub fn append_string_to_top(&mut self, s: String) {
+        for c in s.chars() {
+            self.append_key_to_top(Key::Char(c));
+        }
+    }
 
     pub fn add_action(&mut self, action: Action, cur_line: usize, pos: Coordinates) {
         self.backward_stack.push(CmdAction {
             action,
             cur_line,
             pos,
-            contents: vec![]
+            contents: vec![],
         })
     }
-
 }
