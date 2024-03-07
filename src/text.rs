@@ -81,7 +81,9 @@ impl Text {
         self.lines[line].len()
     }
     pub fn line_at(&self, line: usize) -> String {
-        let line = line.min(self.lines.len() - 1);
+        if line >= self.lines.len() {
+            return "".to_string();
+        }
         self.lines[line].clone()
     }
 
@@ -95,6 +97,16 @@ impl Text {
 
     pub fn push_line(&mut self, content: String) {
         self.lines.push(content);
+    }
+
+    pub fn pop_char_at_line(&mut self, line: usize) -> Option<char> {
+        self.lines[line].pop()
+    }
+    pub fn push_char_at_line(&mut self, line: usize, c: char) {
+        if self.lines.len() == 0 {
+            self.lines.push("".to_string());
+        }
+        self.lines[line].push(c)
     }
 
     // idx start from 0

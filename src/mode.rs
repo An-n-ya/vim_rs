@@ -8,6 +8,7 @@ pub enum Mode {
     Visual,
     Insert,
     Command,
+    Search,
     Exit,
 }
 
@@ -18,6 +19,7 @@ impl std::fmt::Display for Mode {
             Mode::Visual => "VISUAL",
             Mode::Insert => "INSERT",
             Mode::Command => "COMMAND",
+            Mode::Search => "SEARCH",
             Mode::Exit => "EXIT",
         };
 
@@ -32,6 +34,7 @@ impl Mode {
             Mode::Visual => Self::handle_visual(editor, key),
             Mode::Insert => Self::handle_insert(editor, key),
             Mode::Command => Self::handle_command(editor, key),
+            Mode::Search => Self::handle_command(editor, key),
             Mode::Exit => unreachable!(),
         }
     }
@@ -237,7 +240,11 @@ impl Mode {
                 }
                 Mode::Insert
             }
-            Key::Char(':') => Mode::Command,
+            Key::Char(':') => {
+                editor.set_cursor_style(crate::CursorStyle::Bar);
+                Mode::Command
+            }
+            Key::Char('/') => Mode::Search,
             Key::Char('v') => {
                 let mut pos = editor.cur_pos;
                 pos = Coordinates {
@@ -397,12 +404,28 @@ impl Mode {
     }
     fn handle_command(editor: &mut TextEditor, key: Key) -> Self {
         match key {
+            Key::Char(c) => {
+                if c == '\n' {
+                    match editor.try_perform_command() {
+                        Some(mode) => return mode,
+                        _ => {}
+                    }
+                } else {
+                    editor.bar_text.push_char_at_line(0, c);
+                }
+                editor.mode
+            }
+            Key::Backspace => {
+                editor.bar_text.pop_char_at_line(0);
+                Mode::Command
+            }
             Key::Esc => {
+                editor.bar_text.delete_line_at(0);
                 editor.set_cursor_style(crate::CursorStyle::Block);
                 Mode::Normal
             }
             Key::Ctrl('q') => Mode::Exit,
-            _ => Mode::Command,
+            _ => editor.mode,
         }
     }
 }

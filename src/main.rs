@@ -38,7 +38,9 @@ struct Size(u16, u16);
 
 struct TextEditor {
     text: Text,
+    bar_text: Text,
     cur_pos: Coordinates,
+    saved_pos: Option<Coordinates>,
     cur_line: usize,
     view: TextView,
     select_view: SelectView,
@@ -135,7 +137,9 @@ impl TextEditor {
         let out = Box::new(out);
         TextEditor {
             text,
+            bar_text: Text::new(),
             cur_pos: Coordinates { x: 1, y: 1 },
+            saved_pos: None,
             cur_line: 1,
             view,
             select_view: SelectView::None,
@@ -168,7 +172,9 @@ impl TextEditor {
         let out = Box::new(out);
         TextEditor {
             text,
+            bar_text: Text::new(),
             cur_pos: Coordinates { x: 1, y: 1 },
+            saved_pos: None,
             cur_line: 1,
             view,
             select_view: SelectView::None,
@@ -185,23 +191,40 @@ impl TextEditor {
     }
 
     fn flush(&mut self) {
-        let pos = &self.cur_pos;
-        let (mut old_x, old_y) = (pos.x, pos.y);
-
+        let mut old_pos = Coordinates { x: 1, y: 1 };
+        if self.mode == Mode::Command || self.mode == Mode::Search {
+            if self.saved_pos == None {
+                self.saved_pos = Some(self.cur_pos);
+            }
+        } else {
+            if let Some(pos) = self.saved_pos {
+                old_pos = pos;
+                self.saved_pos = None;
+            } else {
+                old_pos = self.cur_pos;
+            }
+        }
+        write!(stderr(), "saved_pos {:?}\n", self.saved_pos).unwrap();
         self.print_text();
         self.show_bar();
 
         // FIXME: when '$' status is on, we should also move to the end of the line
         //          no matter what old_x is.
-        old_x = old_x.min(self.len_of_cur_line());
-        self.set_pos(old_x, old_y);
+        if self.mode != Mode::Command && self.mode != Mode::Search {
+            old_pos.x = old_pos.x.min(self.len_of_cur_line());
+            self.set_pos(old_pos.x, old_pos.y);
+        } else {
+            let x = self.mode.to_string().len() + 2 + self.bar_text.line_at(0).len();
+            self.set_pos(x, self.terminal_size.1 as usize);
+        }
     }
 
     fn print_text(&mut self) {
         write!(
             self.out,
-            "{}{}",
+            "{}{}{}",
             termion::clear::All,
+            termion::style::Reset,
             termion::cursor::Goto(1, 1)
         )
         .unwrap();
@@ -344,10 +367,23 @@ impl TextEditor {
         write!(
             self.out,
             "{}",
-            termion::cursor::Goto(0, (self.terminal_size.1) as u16)
+            termion::cursor::Goto(1, (self.terminal_size.1) as u16)
         )
         .unwrap();
-        write!(self.out, "{}{} line-count={} filename: {}, size: ({}, {}) line[{}-{}] pos[{}:{}] mode:{} task:{} {}",
+        match self.mode {
+            Mode::Command | Mode::Search => {
+                write!(
+                    self.out,
+                    "{}{}{}:{}",
+                    color::Fg(color::Yellow),
+                    style::Bold,
+                    self.mode,
+                    self.bar_text.line_at(0)
+                )
+                .unwrap();
+            }
+            _ => {
+                write!(self.out, "{}{} line-count={} filename: {}, size: ({}, {}) line[{}-{}] pos[{}:{}] mode:{} task:{} {}",
                     color::Fg(color::Blue),
                     style::Bold,
                     self.text_length(),
@@ -362,6 +398,8 @@ impl TextEditor {
                     self.task,
                     style::Reset
                 ).unwrap();
+            }
+        }
     }
 
     fn set_pos(&mut self, x: usize, y: usize) {
@@ -375,7 +413,6 @@ impl TextEditor {
 
     fn set_cursor_style(&mut self, style: CursorStyle) {
         match style {
-            // FIXME: cursor is not blinking
             CursorStyle::Bar => write!(self.out, "{}", termion::cursor::BlinkingBar),
             CursorStyle::Block => write!(self.out, "{}", termion::cursor::BlinkingBlock),
             CursorStyle::Underline => write!(self.out, "{}", termion::cursor::BlinkingUnderline),
@@ -392,6 +429,20 @@ impl TextEditor {
         .unwrap();
     }
 
+    pub fn try_perform_command(&mut self) -> Option<Mode> {
+        assert!(self.mode == Mode::Command || self.mode == Mode::Search);
+        if self.mode == Mode::Command {
+            match self.bar_text.line_at(0).as_str() {
+                "q" => Some(Mode::Exit),
+                _ => {
+                    unimplemented!()
+                }
+            }
+        } else {
+            // TODO: handle search
+            None
+        }
+    }
     pub fn try_perform_task(&mut self) {
         self.processing_task = true;
         if self.task.is_movement() {
