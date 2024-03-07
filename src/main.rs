@@ -50,6 +50,7 @@ struct TextEditor {
     action_stack: ActionStack,
     processing_action: bool,
     processing_task: bool,
+    repeating_action: bool,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -146,6 +147,7 @@ impl TextEditor {
             action_stack: ActionStack::default(),
             processing_action: false,
             processing_task: false,
+            repeating_action: false,
         }
     }
 
@@ -178,6 +180,7 @@ impl TextEditor {
             action_stack: ActionStack::default(),
             processing_action: false,
             processing_task: false,
+            repeating_action: false,
         }
     }
 
@@ -439,10 +442,12 @@ impl TextEditor {
     pub fn restore_action(&mut self, action: Option<CmdAction>) {
         self.processing_action = true;
         if let Some(action) = action {
-            let pos = action.pos;
-            let cur_line = action.cur_line;
-            self.set_pos(pos.x, pos.y);
-            self.cur_line = cur_line;
+            if !self.repeating_action {
+                let pos = action.pos;
+                let cur_line = action.cur_line;
+                self.set_pos(pos.x, pos.y);
+                self.cur_line = cur_line;
+            }
             match action.action {
                 Action::Insert => action.contents.iter().for_each(|&a| {
                     if cfg!(test) {
@@ -459,6 +464,7 @@ impl TextEditor {
             }
         }
         self.processing_action = false;
+        self.repeating_action = false;
     }
 
     fn len_of_cur_line(&self) -> usize {

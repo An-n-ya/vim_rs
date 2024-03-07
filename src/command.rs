@@ -2,7 +2,7 @@ use termion::event::Key;
 
 use crate::Coordinates;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CmdAction {
     pub action: Action,
     pub pos: Coordinates,
@@ -10,7 +10,7 @@ pub struct CmdAction {
     pub contents: Vec<Key>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Action {
     Insert,
     Delete,
@@ -23,6 +23,10 @@ pub struct ActionStack {
 }
 
 impl ActionStack {
+    pub fn current(&self) -> Option<CmdAction> {
+        let res = self.backward_stack.last().map(|action| action.clone());
+        res
+    }
     pub fn forward(&mut self) -> Option<CmdAction> {
         let action = self.forward_stack.pop();
         if action.is_none() {

@@ -157,6 +157,11 @@ impl Mode {
                 editor.revoke_action(action);
                 Mode::Normal
             }
+            Key::Char('.') => {
+                editor.repeating_action = true;
+                editor.restore_action(editor.action_stack.current());
+                Mode::Normal
+            }
             Key::Char('a') => {
                 editor.change_mode_immediately(Mode::Insert);
                 editor.inc_x();
@@ -172,9 +177,11 @@ impl Mode {
             }
             Key::Char('x') => {
                 let c = editor.delete_cur_char();
-                editor
-                    .action_stack
-                    .add_action(Action::Delete, editor.cur_line, editor.cur_pos);
+                if !editor.processing_action {
+                    editor
+                        .action_stack
+                        .add_action(Action::Delete, editor.cur_line, editor.cur_pos);
+                }
                 if let Some(c) = c {
                     if !editor.processing_action {
                         editor.action_stack.append_key_to_top(Key::Char(c));
@@ -223,9 +230,11 @@ impl Mode {
             }
             Key::Char('i') => {
                 editor.set_cursor_style(crate::CursorStyle::Bar);
-                editor
-                    .action_stack
-                    .add_action(Action::Insert, editor.cur_line, editor.cur_pos);
+                if !editor.processing_action {
+                    editor
+                        .action_stack
+                        .add_action(Action::Insert, editor.cur_line, editor.cur_pos);
+                }
                 Mode::Insert
             }
             Key::Char(':') => Mode::Command,
@@ -401,7 +410,6 @@ impl Mode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use termion::event::Key;
 
     fn init(lines: Vec<String>) -> TextEditor {
         return TextEditor::new_from_vec(&lines);
@@ -630,5 +638,19 @@ mod tests {
         // FIXME: why this test is failed?
         // assert_eq!(editor.text.line_at(0), "he");
         assert_eq!(editor.text.line_at(1), "world");
+    }
+
+    #[test]
+    fn repeat_previous_action_test() {
+        let mut editor = init(vec!["hello".to_string(), "world".to_string()]);
+
+        assert_eq!(editor.cur_char(), 'h');
+        let keys = vec![Key::Char('x'), Key::Esc];
+        handle_keys(&mut editor, keys);
+        assert_eq!(editor.text.line_at(0), "ello");
+
+        let keys = vec![Key::Char('l'), Key::Char('.'), Key::Char('.'), Key::Esc];
+        handle_keys(&mut editor, keys);
+        assert_eq!(editor.text.line_at(0), "eo");
     }
 }
