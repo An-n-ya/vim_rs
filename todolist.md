@@ -1,13 +1,14 @@
-- command mode: input text on bottom bar
+- command mode: input text on bottom bar :heavy_check_mark:
 - command mode: flush to disk
-- repeat last command `.`
-- redo/undo
+- repeat last command `.` :heavy_check_mark:
+- redo/undo :heavy_check_mark:
 - search mode
 - search grep
 - task: support command like `yy`, `2dd`
-- visual mode
+- visual mode :heavy_check_mark:
 - view: split screen
 - view: `zz` `gg` `G` `C-d` `C-u`
 - clipboard
 - read config file
-- integrate to plugin system
+- integrate plugin system
+- LSP

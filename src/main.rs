@@ -429,11 +429,19 @@ impl TextEditor {
         .unwrap();
     }
 
+    fn flush_to_disk(&self) {
+        fs::write(&self.file_name, self.text.to_string()).unwrap();
+    }
+
     pub fn try_perform_command(&mut self) -> Option<Mode> {
         assert!(self.mode == Mode::Command || self.mode == Mode::Search);
         if self.mode == Mode::Command {
             match self.bar_text.line_at(0).as_str() {
                 "q" => Some(Mode::Exit),
+                "w" => {
+                    self.flush_to_disk();
+                    Some(Mode::Normal)
+                }
                 _ => {
                     unimplemented!()
                 }

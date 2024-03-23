@@ -99,6 +99,10 @@ impl Text {
         self.lines.push(content);
     }
 
+    pub fn to_string(&self) -> String {
+        self.lines.join("\n")
+    }
+
     pub fn pop_char_at_line(&mut self, line: usize) -> Option<char> {
         self.lines[line].pop()
     }

@@ -10,10 +10,8 @@
             "request": "launch",
             "program": "${workspaceRoot}/target/debug/vim_rs",
             "args": ["${workspaceRoot}/test"],
-            "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
             "preLaunchTask": "build",
-            "externalConsole": true
         }
     ]
 }
