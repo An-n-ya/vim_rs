@@ -1,10 +1,12 @@
 mod command;
+mod highlight;
 mod mode;
 mod task;
 mod text;
 
 use crate::mode::Mode;
 use command::{Action, ActionStack, CmdAction};
+use highlight::HighLighter;
 use std::{
     env::args,
     fs,
@@ -53,6 +55,7 @@ struct TextEditor {
     processing_action: bool,
     processing_task: bool,
     repeating_action: bool,
+    highlighter: HighLighter,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -118,6 +121,7 @@ impl TextEditor {
     pub fn new(file_name: &str) -> Self {
         let mut text = Text::new();
         let file_handle = fs::read_to_string(file_name).unwrap();
+        let highlighter = HighLighter::new(file_name);
         for line in file_handle.lines() {
             text.push_line(line.to_string());
         }
@@ -152,11 +156,13 @@ impl TextEditor {
             processing_action: false,
             processing_task: false,
             repeating_action: false,
+            highlighter,
         }
     }
 
     #[cfg(test)]
     pub fn new_from_vec(lines: &Vec<String>) -> Self {
+        let highlighter = HighLighter::new("test.rs");
         let mut text = Text::new();
         for line in lines {
             text.push_line(line.clone());
@@ -187,6 +193,7 @@ impl TextEditor {
             processing_action: false,
             processing_task: false,
             repeating_action: false,
+            highlighter,
         }
     }
 
@@ -230,14 +237,26 @@ impl TextEditor {
         .unwrap();
         for line in self.view.lower_line()..self.view.upper_line() {
             let text = self.text.line_at(line as usize);
+            let line_text = self.highlighter.highlight_line(&text);
+            let highlight_text = line_text.as_bytes();
+            let mut h_ind = 0;
             for (col, c) in text.chars().enumerate() {
                 if self.is_select_start(col, line) {
                     write!(self.out, "{}", termion::style::Invert).unwrap();
                 }
-                write!(self.out, "{}", c).unwrap();
+                while highlight_text[h_ind] != c as u8 {
+                    write!(self.out, "{}", highlight_text[h_ind] as char).unwrap();
+                    h_ind += 1;
+                }
+
+                // write!(self.out, "{}", c).unwrap();
                 if self.is_select_end(col, line) {
                     write!(self.out, "{}", termion::style::NoInvert).unwrap();
                 }
+            }
+            while h_ind < highlight_text.len() {
+                write!(self.out, "{}", highlight_text[h_ind] as char).unwrap();
+                h_ind += 1;
             }
             writeln!(self.out, "\r").unwrap();
         }
