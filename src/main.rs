@@ -9,6 +9,7 @@ use command::{Action, ActionStack, CmdAction};
 use highlight::HighLighter;
 use std::{
     env::args,
+    fmt::write,
     fs,
     io::{stderr, stdin, stdout, BufWriter, Write},
 };
@@ -213,6 +214,7 @@ impl TextEditor {
         }
         write!(stderr(), "saved_pos {:?}\n", self.saved_pos).unwrap();
         self.print_text();
+        self.print_dialog();
         self.show_bar();
 
         // FIXME: when '$' status is on, we should also move to the end of the line
@@ -382,6 +384,23 @@ impl TextEditor {
         self.terminal_size.1 - 1
     }
 
+    fn print_dialog(&mut self) {
+        let x = 20;
+        let y = 10;
+        let width = 20;
+        let height = 15;
+        write!(self.out, "{}", termion::cursor::Goto(x, y as u16)).unwrap();
+        write!(self.out, "{}", color::Bg(color::LightWhite)).unwrap();
+        for i in 0..height {
+            write!(self.out, "{}", termion::cursor::Goto(x, y + i as u16)).unwrap();
+            for _ in 0..width {
+                write!(self.out, " ").unwrap();
+            }
+        }
+        write!(self.out, "{}", termion::cursor::Goto(20, 10 as u16)).unwrap();
+        write!(self.out, "hello world").unwrap();
+        write!(self.out, "{}", style::Reset).unwrap();
+    }
     fn show_bar(&mut self) {
         write!(
             self.out,
@@ -402,7 +421,8 @@ impl TextEditor {
                 .unwrap();
             }
             _ => {
-                write!(self.out, "{}{} line-count={} filename: {}, size: ({}, {}) line[{}-{}] pos[{}:{}] mode:{} task:{} {}",
+                write!(self.out, "{}{}{} line-count={} filename: {}, size: ({}, {}) line[{}-{}] pos[{}:{}] mode:{} task:{} {}",
+                    color::Bg(color::Green),
                     color::Fg(color::Blue),
                     style::Bold,
                     self.text_length(),
