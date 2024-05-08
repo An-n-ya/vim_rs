@@ -37,6 +37,7 @@ enum CursorStyle {
     Underline,
 }
 
+#[derive(Clone, Copy)]
 struct Size(u16, u16);
 
 struct TextEditor {
@@ -57,6 +58,14 @@ struct TextEditor {
     processing_task: bool,
     repeating_action: bool,
     highlighter: HighLighter,
+    dialogs: Vec<Dialog>,
+}
+
+#[derive(Clone)]
+struct Dialog {
+    pos: Coordinates,
+    size: Size,
+    contents: Vec<String>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -158,6 +167,7 @@ impl TextEditor {
             processing_task: false,
             repeating_action: false,
             highlighter,
+            dialogs: vec![],
         }
     }
 
@@ -195,6 +205,7 @@ impl TextEditor {
             processing_task: false,
             repeating_action: false,
             highlighter,
+            dialogs: vec![],
         }
     }
 
@@ -214,7 +225,10 @@ impl TextEditor {
         }
         write!(stderr(), "saved_pos {:?}\n", self.saved_pos).unwrap();
         self.print_text();
-        self.print_dialog();
+        for i in 0..self.dialogs.len() {
+            self.print_dialog(self.dialogs[i].clone());
+        }
+        self.dialogs.clear();
         self.show_bar();
 
         // FIXME: when '$' status is on, we should also move to the end of the line
@@ -384,11 +398,13 @@ impl TextEditor {
         self.terminal_size.1 - 1
     }
 
-    fn print_dialog(&mut self) {
-        let x = 20;
-        let y = 10;
-        let width = 20;
-        let height = 15;
+    fn print_dialog(&mut self, dialog: Dialog) {
+        let (x, y, width, height) = (
+            dialog.pos.x as u16,
+            dialog.pos.y as u16,
+            dialog.size.0,
+            dialog.size.1,
+        );
         write!(self.out, "{}", termion::cursor::Goto(x, y as u16)).unwrap();
         write!(self.out, "{}", color::Bg(color::LightWhite)).unwrap();
         for i in 0..height {
@@ -397,8 +413,10 @@ impl TextEditor {
                 write!(self.out, " ").unwrap();
             }
         }
-        write!(self.out, "{}", termion::cursor::Goto(20, 10 as u16)).unwrap();
-        write!(self.out, "hello world").unwrap();
+        for (i, line) in dialog.contents.iter().enumerate() {
+            write!(self.out, "{}", termion::cursor::Goto(x, y + i as u16)).unwrap();
+            write!(self.out, "{line}").unwrap();
+        }
         write!(self.out, "{}", style::Reset).unwrap();
     }
     fn show_bar(&mut self) {
